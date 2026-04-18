@@ -1,0 +1,196 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =========================================
+// ENUM TYPES
+// =========================================
+
+enum FriendRequestStatus {
+  pending
+  accepted
+  rejected
+}
+
+enum ConversationType {
+  direct
+  group
+}
+
+enum MemberRole {
+  admin
+  member
+}
+
+enum MessageType {
+  text
+  image
+  file
+}
+
+// =========================================
+// USERS
+// =========================================
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  username     String    @unique
+  phone        String?
+  dateOfBirth  DateTime? @map("date_of_birth")
+  bio          String?
+  avatarUrl    String?   @map("avatar_url")
+  isOnline    Boolean   @default(false) @map("is_online")
+  lastSeen     DateTime? @map("last_seen")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  sentFriendRequests       FriendRequest[] @relation("SentFriendRequests")
+  receivedFriendRequests   FriendRequest[] @relation("ReceivedFriendRequests")
+  friendships             Friendship[] @relation("UserFriendships")
+  friendOf                Friendship[] @relation("FriendOfFriendships")
+  ownedConversations      Conversation[] @relation("ConversationOwner")
+  conversationMemberships ConversationMember[] @relation("UserConversationMemberships")
+  sentMessages            Message[] @relation("UserSentMessages")
+  messageReads            MessageRead[] @relation("UserMessageReads")
+
+  @@map("users")
+  @@index([email])
+  @@index([username])
+}
+
+// =========================================
+// FRIEND REQUESTS
+// =========================================
+
+model FriendRequest {
+  id         String             @id @default(uuid())
+  senderId   String             @map("sender_id")
+  receiverId String             @map("receiver_id")
+  status     FriendRequestStatus @default(pending)
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  sender   User @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade, map: "friend_requests_sender_id_fkey")
+  receiver User @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade, map: "friend_requests_receiver_id_fkey")
+
+  @@unique([senderId, receiverId])
+  @@map("friend_requests")
+  @@index([receiverId])
+}
+
+// =========================================
+// FRIENDSHIPS
+// =========================================
+
+model Friendship {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  friendId  String   @map("friend_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user   User @relation("UserFriendships", fields: [userId], references: [id], onDelete: Cascade, map: "friendships_user_id_fkey")
+  friend User @relation("FriendOfFriendships", fields: [friendId], references: [id], onDelete: Cascade, map: "friendships_friend_id_fkey")
+
+  @@unique([userId, friendId])
+  @@map("friendships")
+  @@index([userId])
+}
+
+// =========================================
+// CONVERSATIONS
+// =========================================
+
+model Conversation {
+  id            String           @id @default(uuid())
+  type          ConversationType
+  name          String?
+  avatarUrl     String?          @map("avatar_url")
+  createdById   String?          @map("created_by")
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  createdBy    User?               @relation("ConversationOwner", fields: [createdById], references: [id])
+  members      ConversationMember[] @relation("ConversationMemberList")
+  messages     Message[] @relation("ConversationMessages")
+
+  @@map("conversations")
+}
+
+// =========================================
+// CONVERSATION MEMBERS
+// =========================================
+
+model ConversationMember {
+  id             String     @id @default(uuid())
+  conversationId String     @map("conversation_id")
+  userId         String     @map("user_id")
+  role           MemberRole @default(member)
+  isPinned       Boolean    @default(false) @map("is_pinned")
+  isHidden       Boolean    @default(false) @map("is_hidden")
+  joinedAt       DateTime   @default(now()) @map("joined_at")
+
+  // Relations
+  conversation Conversation @relation("ConversationMemberList", fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation("UserConversationMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_members")
+  @@index([userId])
+  @@index([conversationId])
+}
+
+// =========================================
+// MESSAGES
+// =========================================
+
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String      @map("conversation_id")
+  senderId       String?     @map("sender_id")
+  content        String?
+  type           MessageType @default(text)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime?   @map("updated_at")
+  isDeleted      Boolean     @default(false) @map("is_deleted")
+
+  // Relations
+  conversation Conversation @relation("ConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?        @relation("UserSentMessages", fields: [senderId], references: [id])
+  readBy       MessageRead[] @relation("MessageReadStatus")
+
+  @@map("messages")
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+// =========================================
+// MESSAGE READ STATUS
+// =========================================
+
+model MessageRead {
+  id        String   @id @default(uuid())
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")
+  readAt    DateTime @default(now()) @map("read_at")
+
+  // Relations
+  message Message @relation("MessageReadStatus", fields: [messageId], references: [id], onDelete: Cascade, map: "message_reads_message_id_fkey")
+  user    User    @relation("UserMessageReads", fields: [userId], references: [id], onDelete: Cascade, map: "message_reads_user_id_fkey")
+
+  @@unique([messageId, userId])
+  @@map("message_reads")
+  @@index([userId])
+}

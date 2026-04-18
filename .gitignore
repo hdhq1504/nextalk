@@ -1,0 +1,40 @@
+.cursor
+.agents
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+
+# Docker
+.docker/
+
+# Prisma
+generated/
+
+# Backend
+backend/dist/
+backend/node_modules/
+
+# Frontend
+frontend/dist/
+frontend/node_modules/
