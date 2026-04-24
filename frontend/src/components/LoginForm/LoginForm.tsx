@@ -12,7 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/PasswordInput/PasswordInput'
-import { authService } from '@/utils/auth'
+import { authService } from '@/services/auth.service'
+import { useAuthStore } from '@/stores/auth-store'
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email format'),
@@ -21,17 +22,31 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>
 
-export function LoginForm({ className, ...props }: React.ComponentProps<'form'>) {
+export function LoginForm({
+  className,
+  ...props
+}: React.ComponentProps<'form'>) {
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
+  const login = useAuthStore((state) => state.login)
 
   const {
     register,
     handleSubmit,
-    formState: { errors }
+    formState: { errors },
+    setValue
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema)
   })
+
+  useEffect(() => {
+    const rememberedEmail = authService.getRememberedEmail()
+    if (rememberedEmail) {
+      setValue('email', rememberedEmail)
+      setRememberMe(true)
+    }
+  }, [setValue])
 
   useEffect(() => {
     document.getElementById('email')?.focus()
@@ -40,11 +55,15 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'form'>)
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true)
     try {
-      const response = await authService.login(data.email, data.password)
-      authService.saveTokens(response.tokens)
-      toast.success('Login successful', {
-        description: `Welcome back, ${response.user.username}!`
-      })
+      await login(data.email, data.password)
+
+      if (rememberMe) {
+        authService.setRememberedEmail(data.email)
+      } else {
+        authService.clearRememberedEmail()
+      }
+
+      toast.success('Login successful')
       navigate('/')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Login failed'
@@ -63,8 +82,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'form'>)
       {...props}
     >
       <div className='flex flex-col items-center gap-1 text-center'>
-        <h1 className='text-2xl font-semibold tracking-tight'>Login to your account</h1>
-        <p className='text-muted-foreground text-sm'>Enter your email below to login to your account</p>
+        <h1 className='text-2xl font-semibold tracking-tight'>
+          Login to your account
+        </h1>
+        <p className='text-muted-foreground text-sm'>
+          Enter your email below to login to your account
+        </p>
       </div>
 
       <div className='flex flex-col gap-5'>
@@ -80,7 +103,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'form'>)
             {...register('email')}
             aria-describedby={errors.email ? 'email-error' : undefined}
           />
-          {errors.email && <FieldError id='email-error'>{errors.email.message}</FieldError>}
+          {errors.email && (
+            <FieldError id='email-error'>{errors.email.message}</FieldError>
+          )}
         </Field>
 
         <Field error={!!errors.password}>
@@ -94,13 +119,26 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'form'>)
             {...register('password')}
             aria-describedby={errors.password ? 'password-error' : undefined}
           />
-          {errors.password && <FieldError id='password-error'>{errors.password.message}</FieldError>}
+          {errors.password && (
+            <FieldError id='password-error'>
+              {errors.password.message}
+            </FieldError>
+          )}
         </Field>
       </div>
 
       <div className='flex items-center'>
-        <Checkbox id='remember' className='mr-2' />
-        <label htmlFor='remember' className='text-muted-foreground cursor-pointer text-sm select-none'>
+        <Checkbox
+          id='remember'
+          className='mr-2'
+          checked={rememberMe}
+          onCheckedChange={(checked) => setRememberMe(checked === true)}
+          disabled={isLoading}
+        />
+        <label
+          htmlFor='remember'
+          className='text-muted-foreground cursor-pointer text-sm select-none'
+        >
           Remember me
         </label>
       </div>
@@ -112,7 +150,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'form'>)
 
       <p className='text-muted-foreground text-center text-sm'>
         Don&apos;t have an account?{' '}
-        <Link to='/signup' className='text-foreground underline underline-offset-4 hover:opacity-80'>
+        <Link
+          to='/signup'
+          className='text-foreground underline underline-offset-4 hover:opacity-80'
+        >
           Sign up
         </Link>
       </p>

@@ -27,7 +27,10 @@ function FieldLegend({
     <legend
       data-slot='field-legend'
       data-variant={variant}
-      className={cn('mb-3 font-medium data-[variant=label]:text-sm data-[variant=legend]:text-base', className)}
+      className={cn(
+        'mb-3 font-medium data-[variant=label]:text-sm data-[variant=legend]:text-base',
+        className
+      )}
       {...props}
     />
   )
@@ -46,26 +49,30 @@ function FieldGroup({ className, ...props }: React.ComponentProps<'div'>) {
   )
 }
 
-const fieldVariants = cva('group/field flex w-full gap-3 data-[invalid=true]:text-destructive', {
-  variants: {
-    orientation: {
-      vertical: 'flex-col *:w-full [&>.sr-only]:w-auto',
-      horizontal:
-        'flex-row items-center has-[>[data-slot=field-content]]:items-start *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px',
-      responsive:
-        'flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px'
+const fieldVariants = cva(
+  'group/field flex w-full gap-3 data-[invalid=true]:text-destructive',
+  {
+    variants: {
+      orientation: {
+        vertical: 'flex-col *:w-full [&>.sr-only]:w-auto',
+        horizontal:
+          'flex-row items-center has-[>[data-slot=field-content]]:items-start *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px',
+        responsive:
+          'flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px'
+      }
+    },
+    defaultVariants: {
+      orientation: 'vertical'
     }
-  },
-  defaultVariants: {
-    orientation: 'vertical'
   }
-})
+)
 
 function Field({
   className,
   orientation = 'vertical',
   ...props
-}: React.ComponentProps<'div'> & VariantProps<typeof fieldVariants> & { error?: boolean }) {
+}: React.ComponentProps<'div'> &
+  VariantProps<typeof fieldVariants> & { error?: boolean }) {
   return (
     <div
       role='group'
@@ -81,13 +88,19 @@ function FieldContent({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot='field-content'
-      className={cn('group/field-content flex flex-1 flex-col gap-1 leading-snug', className)}
+      className={cn(
+        'group/field-content flex flex-1 flex-col gap-1 leading-snug',
+        className
+      )}
       {...props}
     />
   )
 }
 
-function FieldLabel({ className, ...props }: React.ComponentProps<typeof Label>) {
+function FieldLabel({
+  className,
+  ...props
+}: React.ComponentProps<typeof Label>) {
   return (
     <Label
       data-slot='field-label'
@@ -140,7 +153,10 @@ function FieldSeparator({
     <div
       data-slot='field-separator'
       data-content={!!children}
-      className={cn('relative -my-2 h-5 text-sm group-data-[variant=outline]/field-group:-mb-2', className)}
+      className={cn(
+        'relative -my-2 h-5 text-sm group-data-[variant=outline]/field-group:-mb-2',
+        className
+      )}
       {...props}
     >
       <Separator className='absolute inset-0 top-1/2' />
@@ -173,7 +189,9 @@ function FieldError({
       return null
     }
 
-    const uniqueErrors = [...new Map(errors.map((error) => [error?.message, error])).values()]
+    const uniqueErrors = [
+      ...new Map(errors.map((error) => [error?.message, error])).values()
+    ]
 
     if (uniqueErrors?.length == 1) {
       return uniqueErrors[0]?.message
@@ -181,7 +199,10 @@ function FieldError({
 
     return (
       <ul className='ml-4 flex list-disc flex-col gap-1'>
-        {uniqueErrors.map((error, index) => error?.message && <li key={index}>{error.message}</li>)}
+        {uniqueErrors.map(
+          (error, index) =>
+            error?.message && <li key={index}>{error.message}</li>
+        )}
       </ul>
     )
   }, [children, errors])
@@ -194,7 +215,7 @@ function FieldError({
     <div
       role='alert'
       data-slot='field-error'
-      className={cn('mt-1 text-sm font-normal text-destructive', className)}
+      className={cn('text-destructive mt-1 text-sm font-normal', className)}
       {...props}
     >
       {content}

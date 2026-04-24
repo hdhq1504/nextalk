@@ -13,19 +13,23 @@ interface PasswordStrengthIndicatorProps {
   className?: string
 }
 
-function PasswordStrengthIndicator({ password, className }: PasswordStrengthIndicatorProps) {
+function PasswordStrengthIndicator({
+  password,
+  className
+}: PasswordStrengthIndicatorProps) {
   const { strength, requirements } = checkPasswordStrength(password)
 
   if (!password) {
     return null
   }
 
-  const requirementsList: { key: keyof PasswordRequirements; label: string }[] = [
-    { key: 'minLength', label: 'At least 8 characters' },
-    { key: 'hasUppercase', label: 'Contains uppercase letter' },
-    { key: 'hasNumber', label: 'Contains number' },
-    { key: 'hasSpecial', label: 'Contains special character' }
-  ]
+  const requirementsList: { key: keyof PasswordRequirements; label: string }[] =
+    [
+      { key: 'minLength', label: 'At least 8 characters' },
+      { key: 'hasUppercase', label: 'Contains uppercase letter' },
+      { key: 'hasNumber', label: 'Contains number' },
+      { key: 'hasSpecial', label: 'Contains special character' }
+    ]
 
   const passedCount = Object.values(requirements).filter(Boolean).length
 
@@ -61,9 +65,19 @@ function PasswordStrengthIndicator({ password, className }: PasswordStrengthIndi
       {/* Requirements checklist */}
       <ul className='space-y-1.5'>
         {requirementsList.map(({ key, label }) => (
-          <li key={key} className='text-muted-foreground flex items-center gap-2 text-sm'>
-            <Check className={cn('h-4 w-4 shrink-0', requirements[key] ? 'text-green-600' : 'text-muted')} />
-            <span className={cn(requirements[key] && 'text-foreground')}>{label}</span>
+          <li
+            key={key}
+            className='text-muted-foreground flex items-center gap-2 text-sm'
+          >
+            <Check
+              className={cn(
+                'h-4 w-4 shrink-0',
+                requirements[key] ? 'text-green-600' : 'text-muted'
+              )}
+            />
+            <span className={cn(requirements[key] && 'text-foreground')}>
+              {label}
+            </span>
           </li>
         ))}
       </ul>

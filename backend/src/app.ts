@@ -1,30 +1,35 @@
-import express, { Application, Request, Response } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import { config } from 'dotenv';
-import routes from './routes';
-import { errorHandler } from './middlewares/errorHandler';
-import { ApiResponse } from './types';
+import express, { Application, Request, Response } from 'express'
+import cors from 'cors'
+import helmet from 'helmet'
+import cookieParser from 'cookie-parser'
+import { config } from 'dotenv'
+import routes from './routes'
+import { errorHandler } from './middlewares/errorHandler'
+import { ApiResponse } from './types'
 
-config();
+config()
 
-const app: Application = express();
+const app: Application = express()
 
 // Security Middleware
-app.use(helmet());
+app.use(helmet())
 
 // CORS Configuration
 const corsOptions: cors.CorsOptions = {
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-};
-app.use(cors(corsOptions));
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Set-Cookie'],
+}
+app.use(cors(corsOptions))
+
+// Cookie Parser - Essential for httpOnly cookies
+app.use(cookieParser())
 
 // Body Parser Middleware
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.json({ limit: '10kb' }))
+app.use(express.urlencoded({ extended: true, limit: '10kb' }))
 
 // Health Check Endpoint
 app.get('/health', (_req: Request, res: Response<ApiResponse>) => {
@@ -35,21 +40,21 @@ app.get('/health', (_req: Request, res: Response<ApiResponse>) => {
       status: 'healthy',
       timestamp: new Date().toISOString(),
     },
-  });
-});
+  })
+})
 
 // API Routes
-app.use('/api', routes);
+app.use('/api', routes)
 
 // 404 Handler
 app.use((_req: Request, res: Response<ApiResponse>) => {
   res.status(404).json({
     success: false,
     error: 'Route not found',
-  });
-});
+  })
+})
 
 // Global Error Handler
-app.use(errorHandler);
+app.use(errorHandler)
 
-export default app;
+export default app

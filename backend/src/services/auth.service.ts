@@ -13,6 +13,19 @@ export interface UserResponse {
   createdAt: Date;
 }
 
+export interface UserDetailResponse {
+  id: string;
+  email: string;
+  username: string;
+  avatarUrl: string | null;
+  phone: string | null;
+  dateOfBirth: Date | null;
+  bio: string | null;
+  isOnline: boolean;
+  lastSeen: Date | null;
+  createdAt: Date;
+}
+
 export interface AuthResponse {
   user: UserResponse;
   tokens: Tokens;
@@ -55,7 +68,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new AuthenticationError('Invalid email or password');
+      throw new AuthenticationError('Account not found. Please check your email or sign up.');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
@@ -108,10 +121,41 @@ export class AuthService {
     return this.formatUser(user);
   }
 
+  async getUserDetailById(userId: string): Promise<UserDetailResponse> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    return this.formatUserDetail(user);
+  }
+
+  async updateUser(userId: string, data: { username?: string; phone?: string | null; dateOfBirth?: string | null; bio?: string | null }): Promise<UserDetailResponse> {
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.username !== undefined && { username: data.username }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+        ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null }),
+        ...(data.bio !== undefined && { bio: data.bio }),
+      },
+    });
+
+    return this.formatUserDetail(user);
+  }
+
   async logout(userId: string): Promise<void> {
-    // Với JWT stateless, logout phía server chỉ cần client xóa token
-    // Nếu muốn blacklist token, cần lưu token vào database hoặc Redis
     console.log(`User ${userId} logged out`);
+  }
+
+  async checkEmail(email: string): Promise<boolean> {
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+    return existingUser !== null;
   }
 
   private formatUser(user: { id: string; email: string; username: string; avatarUrl: string | null; createdAt: Date }): UserResponse {
@@ -120,6 +164,32 @@ export class AuthService {
       email: user.email,
       username: user.username,
       avatarUrl: user.avatarUrl,
+      createdAt: user.createdAt,
+    };
+  }
+
+  private formatUserDetail(user: {
+    id: string;
+    email: string;
+    username: string;
+    avatarUrl: string | null;
+    phone: string | null;
+    dateOfBirth: Date | null;
+    bio: string | null;
+    isOnline: boolean;
+    lastSeen: Date | null;
+    createdAt: Date;
+  }): UserDetailResponse {
+    return {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      avatarUrl: user.avatarUrl,
+      phone: user.phone,
+      dateOfBirth: user.dateOfBirth,
+      bio: user.bio,
+      isOnline: user.isOnline,
+      lastSeen: user.lastSeen,
       createdAt: user.createdAt,
     };
   }

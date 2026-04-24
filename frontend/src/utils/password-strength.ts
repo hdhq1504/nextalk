@@ -7,7 +7,7 @@ export interface PasswordRequirements {
   hasSpecial: boolean
 }
 
-const SPECIAL_CHARS = /[!@#$%^&*()_+\-=[\]{};':"|,.<>/?]/g
+const SPECIAL_CHARS = /[!@#$%^&*()_+\-=[\]{};':"|\\,.<>/?~`]/
 
 export function checkPasswordStrength(password: string): {
   strength: PasswordStrength

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, refreshToken, logout, getProfile } from '../controllers/auth.controller';
+import { register, login, refreshToken, logout, getProfile, checkEmail, updateProfile } from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -38,5 +38,19 @@ router.post('/logout', authenticate, logout);
  * @access  Private (requires authentication)
  */
 router.get('/profile', authenticate, getProfile);
+
+/**
+ * @route   PUT /api/auth/profile
+ * @desc    Update current user profile
+ * @access  Private (requires authentication)
+ */
+router.put('/profile', authenticate, updateProfile);
+
+/**
+ * @route   POST /api/auth/check-email
+ * @desc    Check if email is already registered
+ * @access  Public
+ */
+router.post('/check-email', checkEmail);
 
 export default router;

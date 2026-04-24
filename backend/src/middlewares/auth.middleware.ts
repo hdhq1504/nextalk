@@ -1,12 +1,11 @@
-import { Response, NextFunction } from 'express';
-import { verifyAccessToken } from '../utils/jwt';
-import { AuthenticationError } from './errorHandler';
-import { AuthenticatedRequest } from '../types';
+import { Response, NextFunction } from 'express'
+import { verifyAccessToken } from '../utils/jwt'
+import { AuthenticationError } from './errorHandler'
+import { AuthenticatedRequest } from '../types'
 
 /**
  * JWT Authentication Middleware
- * Xác thực Access Token từ Authorization Header
- * Header format: "Bearer <token>"
+ * Supports both Authorization Header and Cookie-based authentication
  */
 export const authenticate = (
   req: AuthenticatedRequest,
@@ -14,37 +13,39 @@ export const authenticate = (
   next: NextFunction
 ): void => {
   try {
-    const authHeader = req.headers.authorization;
+    let token: string | undefined
 
-    if (!authHeader) {
-      throw new AuthenticationError('No authorization header provided');
+    // Try to get token from Authorization header first
+    const authHeader = req.headers.authorization
+    if (authHeader) {
+      const parts = authHeader.split(' ')
+      if (parts.length === 2 && parts[0] === 'Bearer') {
+        token = parts[1]
+      }
     }
 
-    const parts = authHeader.split(' ');
-
-    if (parts.length !== 2 || parts[0] !== 'Bearer') {
-      throw new AuthenticationError('Invalid authorization header format. Use: Bearer <token>');
+    // Fallback to cookie
+    if (!token && req.cookies?.accessToken) {
+      token = req.cookies.accessToken
     }
-
-    const token = parts[1];
 
     if (!token) {
-      throw new AuthenticationError('No token provided');
+      throw new AuthenticationError('No authentication token provided')
     }
 
-    const payload = verifyAccessToken(token);
-    req.user = payload;
+    const payload = verifyAccessToken(token)
+    req.user = payload
 
-    next();
+    next()
   } catch (error) {
-    next(error);
+    next(error)
   }
-};
+}
 
 /**
  * Optional Authentication Middleware
- * Cho phép request đi qua dù có token hay không
- * Nếu có token thì gắn user vào request, không thì bỏ qua
+ * Allows request to pass through regardless of token presence
+ * Attaches user to request if token is valid
  */
 export const optionalAuth = (
   req: AuthenticatedRequest,
@@ -52,33 +53,35 @@ export const optionalAuth = (
   next: NextFunction
 ): void => {
   try {
-    const authHeader = req.headers.authorization;
+    let token: string | undefined
 
-    if (!authHeader) {
-      return next();
+    // Try Authorization header first
+    const authHeader = req.headers.authorization
+    if (authHeader) {
+      const parts = authHeader.split(' ')
+      if (parts.length === 2 && parts[0] === 'Bearer') {
+        token = parts[1]
+      }
     }
 
-    const parts = authHeader.split(' ');
-
-    if (parts.length !== 2 || parts[0] !== 'Bearer') {
-      return next();
+    // Fallback to cookie
+    if (!token && req.cookies?.accessToken) {
+      token = req.cookies.accessToken
     }
-
-    const token = parts[1];
 
     if (!token) {
-      return next();
+      return next()
     }
 
     try {
-      const payload = verifyAccessToken(token);
-      req.user = payload;
+      const payload = verifyAccessToken(token)
+      req.user = payload
     } catch {
-      // Token không hợp lệ nhưng middleware là optional nên vẫn cho đi qua
+      // Token invalid but middleware is optional, continue
     }
 
-    next();
+    next()
   } catch (error) {
-    next(error);
+    next(error)
   }
-};
+}

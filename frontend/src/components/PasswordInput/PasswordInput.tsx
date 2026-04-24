@@ -5,11 +5,18 @@ import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
-interface PasswordInputProps extends Omit<React.ComponentProps<'input'>, 'type'> {
+interface PasswordInputProps extends Omit<
+  React.ComponentProps<'input'>,
+  'type'
+> {
   showToggle?: boolean
 }
 
-function PasswordInput({ className, showToggle = true, ...props }: PasswordInputProps) {
+function PasswordInput({
+  className,
+  showToggle = true,
+  ...props
+}: PasswordInputProps) {
   const [showPassword, setShowPassword] = React.useState(false)
 
   return (
@@ -30,7 +37,11 @@ function PasswordInput({ className, showToggle = true, ...props }: PasswordInput
           tabIndex={-1}
           aria-label={showPassword ? 'Hide password' : 'Show password'}
         >
-          {showPassword ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+          {showPassword ? (
+            <EyeOff className='h-4 w-4' />
+          ) : (
+            <Eye className='h-4 w-4' />
+          )}
         </Button>
       )}
     </div>

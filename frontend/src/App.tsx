@@ -1,10 +1,11 @@
-import { BrowserRouter, Routes, Route } from 'react-router';
-import { Toaster } from 'sonner';
+import { BrowserRouter, Routes, Route } from 'react-router'
+import { Toaster } from 'sonner'
 
-import { GuestRoute } from '@/components/ProtectedRoute/ProtectedRoute';
-import LoginPage from '@/pages/Login/Login';
-import SignUpPage from '@/pages/SignUp/SignUp';
-import HomePage from '@/pages/Home/Home';
+import { GuestRoute, ProtectedRoute } from '@/components/ProtectedRoute'
+import LoginPage from '@/pages/Login/Login'
+import SignUpPage from '@/pages/SignUp/SignUp'
+import { Chat } from '@/pages/Chat/Chat'
+import ProfilePage from '@/pages/Profile/Profile'
 
 function App() {
   return (
@@ -16,8 +17,8 @@ function App() {
           style: {
             background: 'var(--background)',
             border: '1px solid var(--border)',
-            color: 'var(--foreground)',
-          },
+            color: 'var(--foreground)'
+          }
         }}
       />
       <Routes>
@@ -25,10 +26,13 @@ function App() {
           <Route path='/login' element={<LoginPage />} />
           <Route path='/signup' element={<SignUpPage />} />
         </Route>
-        <Route path='/' element={<HomePage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path='/' element={<Chat />} />
+          <Route path='/profile' element={<ProfilePage />} />
+        </Route>
       </Routes>
     </BrowserRouter>
-  );
+  )
 }
 
-export default App;
+export default App
