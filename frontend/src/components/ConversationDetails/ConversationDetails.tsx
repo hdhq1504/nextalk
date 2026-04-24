@@ -48,7 +48,7 @@ export function ConversationDetails({
   const avatarUrl = otherMember?.user.avatarUrl
   const initials = displayName.slice(0, 2).toUpperCase()
 
-  const isGroup = conversation.type === 'group'
+  const isGroup = conversation.isGroup
   const memberCount = conversation.members.length
 
   return (

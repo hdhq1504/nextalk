@@ -6,6 +6,7 @@ import { socketClient } from '@/lib/socket'
 import Sidebar from '@/components/Sidebar'
 import ConversationHeader from '@/components/ConversationHeader'
 import ConversationDetails from '@/components/ConversationDetails'
+import UserInfoModal from '@/components/UserInfoModal'
 import MessageList from '@/components/MessageList'
 import MessageInput from '@/components/MessageInput'
 import { Menu } from 'lucide-react'
@@ -19,6 +20,7 @@ export function Chat() {
   const user = useAuthStore((state) => state.user)
   const [isSidebarOpen, setIsSidebarOpen] = useState(!activeConversation)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [isUserInfoOpen, setIsUserInfoOpen] = useState(false)
 
   useEffect(() => {
     if (!user) {
@@ -94,6 +96,7 @@ export function Chat() {
                 setIsSidebarOpen(true)
               }}
               onShowDetails={() => setIsDetailsOpen(true)}
+              onShowUserInfo={() => setIsUserInfoOpen(true)}
             />
             <Separator />
           </>
@@ -113,6 +116,13 @@ export function Chat() {
           currentUserId={user?.id || ''}
           open={isDetailsOpen}
           onClose={() => setIsDetailsOpen(false)}
+        />
+
+        <UserInfoModal
+          conversation={activeConversation}
+          currentUserId={user?.id || ''}
+          open={isUserInfoOpen}
+          onClose={() => setIsUserInfoOpen(false)}
         />
       </main>
     </div>

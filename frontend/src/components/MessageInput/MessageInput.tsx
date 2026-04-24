@@ -90,7 +90,7 @@ export function MessageInput({ className }: MessageInputProps) {
           </Button>
 
           {showEmojiPicker && (
-            <div className='absolute bottom-full left-0 mb-2 z-50'>
+            <div className='absolute bottom-full left-0 z-50 mb-2'>
               <div
                 className='fixed inset-0'
                 onClick={() => setShowEmojiPicker(false)}

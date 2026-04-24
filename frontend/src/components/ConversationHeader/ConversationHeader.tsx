@@ -11,6 +11,7 @@ interface ConversationHeaderProps {
   className?: string
   onBack?: () => void
   onShowDetails?: () => void
+  onShowUserInfo?: () => void
 }
 
 export function ConversationHeader({
@@ -18,7 +19,8 @@ export function ConversationHeader({
   currentUserId,
   className,
   onBack,
-  onShowDetails
+  onShowDetails,
+  onShowUserInfo
 }: ConversationHeaderProps) {
   if (!conversation) {
     return (
@@ -54,13 +56,22 @@ export function ConversationHeader({
         </Button>
       )}
 
-      <Avatar size='lg' className='shrink-0'>
-        {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
-        <AvatarFallback>{initials}</AvatarFallback>
-      </Avatar>
+      <div className='flex flex-1 shrink-0 items-center gap-3'>
+        <button
+          type='button'
+          onClick={onShowUserInfo}
+          className='rounded-full'
+          aria-label='Show user info'
+        >
+          <Avatar size='lg'>
+            {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+            <AvatarFallback>{initials}</AvatarFallback>
+          </Avatar>
+        </button>
 
-      <div className='min-w-0 flex-1'>
-        <h2 className='truncate text-base font-medium'>{displayName}</h2>
+        <div className='min-w-0 flex-1'>
+          <h2 className='truncate text-base font-medium'>{displayName}</h2>
+        </div>
       </div>
 
       <div className='flex items-center gap-1'>
@@ -70,7 +81,12 @@ export function ConversationHeader({
         <Button variant='ghost' size='icon-sm' aria-label='Video call'>
           <Video className='size-4' />
         </Button>
-        <Button variant='ghost' size='icon-sm' onClick={onShowDetails} aria-label='More options'>
+        <Button
+          variant='ghost'
+          size='icon-sm'
+          onClick={onShowDetails}
+          aria-label='More options'
+        >
           <MoreVertical className='size-4' />
         </Button>
       </div>

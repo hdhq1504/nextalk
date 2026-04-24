@@ -1,5 +1,10 @@
 import { apiClient } from '@/lib/axios'
-import type { FriendRequest, Friend, UserSearchResult, ApiResponse } from '@/types/friend'
+import type {
+  FriendRequest,
+  Friend,
+  UserSearchResult,
+  ApiResponse
+} from '@/types/friend'
 
 export const friendService = {
   async searchUsers(query: string): Promise<UserSearchResult[]> {
@@ -29,9 +34,8 @@ export const friendService = {
   },
 
   async getReceivedRequests(): Promise<FriendRequest[]> {
-    const response = await apiClient.get<ApiResponse<FriendRequest[]>>(
-      '/friends/requests'
-    )
+    const response =
+      await apiClient.get<ApiResponse<FriendRequest[]>>('/friends/requests')
 
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.error || 'Failed to fetch friend requests')
@@ -80,7 +84,9 @@ export const friendService = {
     )
 
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.error || 'Failed to fetch pending requests count')
+      throw new Error(
+        response.data.error || 'Failed to fetch pending requests count'
+      )
     }
 
     return response.data.data.count

@@ -13,6 +13,8 @@ function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
         'aria-invalid:border-destructive aria-invalid:ring-destructive/50 aria-invalid:ring-[3px]',
         'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
         'active:shadow-focus',
+        type === 'search' &&
+          '[&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden',
         className
       )}
       {...props}
