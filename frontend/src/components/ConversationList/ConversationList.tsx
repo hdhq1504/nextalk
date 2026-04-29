@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useChatStore } from '@/stores/chat-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { ConversationItem } from '../ConversationItem.tsx/ConversationItem'
+import { NewChatModal } from '@/components/NewChatModal'
 import { Loader2, MessageSquare, Plus, Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +24,7 @@ export function ConversationList({
   const user = useAuthStore((state) => state.user)
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [isNewChatOpen, setIsNewChatOpen] = useState(false)
 
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations
@@ -73,10 +75,19 @@ export function ConversationList({
             Start a new conversation to begin chatting…
           </p>
         </div>
-        <Button size='sm' className='mt-2'>
+        <Button
+          size='sm'
+          className='mt-2'
+          onClick={() => setIsNewChatOpen(true)}
+        >
           <Plus className='mr-1 size-3' aria-hidden='true' />
           New Conversation
         </Button>
+        <NewChatModal
+          open={isNewChatOpen}
+          onOpenChange={setIsNewChatOpen}
+          onConversationCreated={onConversationClick}
+        />
       </div>
     )
   }
@@ -85,6 +96,17 @@ export function ConversationList({
     <div className='flex flex-1 flex-col overflow-hidden'>
       {/* Search */}
       <div className='shrink-0 border-b p-3'>
+        <div className='mb-3 flex items-center justify-between gap-2'>
+          <h2 className='text-sm font-medium'>Chats</h2>
+          <Button
+            type='button'
+            size='icon-sm'
+            onClick={() => setIsNewChatOpen(true)}
+            aria-label='Start new chat'
+          >
+            <Plus className='size-4' />
+          </Button>
+        </div>
         <div className='relative'>
           <Search className='text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2' />
           <Input
@@ -128,6 +150,11 @@ export function ConversationList({
           ))
         )}
       </div>
+      <NewChatModal
+        open={isNewChatOpen}
+        onOpenChange={setIsNewChatOpen}
+        onConversationCreated={onConversationClick}
+      />
     </div>
   )
 }

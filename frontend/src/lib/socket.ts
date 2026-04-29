@@ -3,6 +3,7 @@ import { getCookie } from '@/lib/cookie'
 import { isTokenExpired } from '@/lib/token'
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000'
+const ACCESS_TOKEN_KEY = 'accessToken'
 
 class SocketClient {
   private static instance: SocketClient
@@ -17,17 +18,22 @@ class SocketClient {
     return SocketClient.instance
   }
 
-  public connect(): Socket {
+  public connect(): Socket | null {
     if (this.socket?.connected) {
       return this.socket
     }
 
-    const token = getCookie('accessToken')
+    const token = this.getAccessToken()
 
-    // If token is expired, don't connect
     if (!token || isTokenExpired(token)) {
       console.warn('Socket connection skipped: no valid token')
-      return this.socket!
+      return null
+    }
+
+    if (this.socket) {
+      this.socket.auth = { token }
+      this.socket.connect()
+      return this.socket
     }
 
     this.socket = io(SOCKET_URL, {
@@ -69,6 +75,31 @@ class SocketClient {
       return
     }
     this.socket.emit(event, data)
+  }
+
+  public emitWithAck<TResponse>(
+    event: string,
+    data?: unknown
+  ): Promise<TResponse> {
+    const socket = this.socket?.connected ? this.socket : this.connect()
+
+    if (!socket) {
+      return Promise.reject(new Error('Socket not connected'))
+    }
+
+    return new Promise((resolve, reject) => {
+      socket.timeout(10000).emit(event, data, (error: Error | null, response: TResponse) => {
+        if (error) {
+          reject(error)
+          return
+        }
+        resolve(response)
+      })
+    })
+  }
+
+  private getAccessToken(): string | null {
+    return localStorage.getItem(ACCESS_TOKEN_KEY) || getCookie(ACCESS_TOKEN_KEY)
   }
 
   public on(event: string, callback: (...args: unknown[]) => void): void {

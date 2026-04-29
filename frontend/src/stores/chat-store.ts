@@ -1,5 +1,9 @@
 import { create } from 'zustand'
-import { chatService } from '@/services/chat.service'
+import {
+  chatService,
+  normalizeConversation,
+  normalizeMessage
+} from '@/services/chat.service'
 import { socketClient } from '@/lib/socket'
 import type { Conversation, Message } from '@/types/chat'
 
@@ -14,8 +18,10 @@ interface ChatState {
   fetchConversations: () => Promise<Conversation[]>
   setActiveConversation: (conversation: Conversation | null) => void
   fetchMessages: (conversationId: string) => Promise<void>
+  createDirectConversation: (friendId: string) => Promise<Conversation>
   sendMessage: (conversationId: string, content: string) => Promise<void>
   addMessage: (message: Message) => void
+  upsertConversation: (conversation: Conversation) => void
   updateConversationLastMessage: (
     conversationId: string,
     message: Message
@@ -50,7 +56,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setActiveConversation: (conversation) => {
+    const currentConversation = get().activeConversation
+    if (currentConversation?.id && currentConversation.id !== conversation?.id) {
+      socketClient.emit('conversation:leave', {
+        conversationId: currentConversation.id
+      })
+    }
+
     set({ activeConversation: conversation })
+
+    if (conversation) {
+      socketClient.emit('conversation:join', { conversationId: conversation.id })
+    }
   },
 
   fetchMessages: async (conversationId) => {
@@ -67,6 +84,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
           error instanceof Error ? error.message : 'Failed to fetch messages',
         isMessagesLoading: false
       })
+    }
+  },
+
+  createDirectConversation: async (friendId) => {
+    set({ isLoading: true, error: null })
+    try {
+      const conversation = await chatService.createDirectConversation(friendId)
+      get().upsertConversation(conversation)
+      get().setActiveConversation(conversation)
+      await get().fetchMessages(conversation.id)
+      set({ isLoading: false })
+      return conversation
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to create conversation',
+        isLoading: false
+      })
+      throw error
     }
   },
 
@@ -103,6 +141,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
     })
   },
 
+  upsertConversation: (conversation) => {
+    set((state) => {
+      const exists = state.conversations.some((c) => c.id === conversation.id)
+      const conversations = exists
+        ? state.conversations.map((c) =>
+            c.id === conversation.id ? { ...c, ...conversation } : c
+          )
+        : [conversation, ...state.conversations]
+
+      conversations.sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      )
+
+      return {
+        conversations,
+        activeConversation:
+          state.activeConversation?.id === conversation.id
+            ? { ...state.activeConversation, ...conversation }
+            : state.activeConversation
+      }
+    })
+  },
+
   updateConversationLastMessage: (conversationId, message) => {
     set((state) => {
       const updatedConversations = state.conversations.map((conv) =>
@@ -126,16 +188,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
 }))
 
 export function initializeSocketListeners(): () => void {
-  const handleNewMessage = (message: Message) => {
+  const handleNewMessage = (rawMessage: unknown) => {
+    const message = normalizeMessage(rawMessage as Parameters<typeof normalizeMessage>[0])
     useChatStore.getState().addMessage(message)
     useChatStore
       .getState()
       .updateConversationLastMessage(message.conversationId, message)
   }
 
-  socketClient.on('new_message', handleNewMessage)
+  const handleConversationUpdate = (rawConversation: unknown) => {
+    useChatStore
+      .getState()
+      .upsertConversation(
+        normalizeConversation(
+          rawConversation as Parameters<typeof normalizeConversation>[0]
+        )
+      )
+  }
+
+  socketClient.on('message:new', handleNewMessage)
+  socketClient.on('conversation:update', handleConversationUpdate)
 
   return () => {
-    socketClient.off('new_message', handleNewMessage)
+    socketClient.off('message:new', handleNewMessage)
+    socketClient.off('conversation:update', handleConversationUpdate)
   }
 }

@@ -12,7 +12,6 @@ import MessageInput from '@/components/MessageInput'
 import { Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { CURRENT_USER } from '@/data/mock-chat'
 
 export function Chat() {
   const { fetchConversations, activeConversation, setActiveConversation } =
@@ -23,12 +22,8 @@ export function Chat() {
   const [isUserInfoOpen, setIsUserInfoOpen] = useState(false)
 
   useEffect(() => {
-    if (!user) {
-      useAuthStore.setState({ user: CURRENT_USER, isAuthenticated: true })
-    }
-  }, [user])
+    if (!user) return
 
-  useEffect(() => {
     socketClient.connect()
     const cleanup = initializeSocketListeners()
     fetchConversations()
@@ -37,7 +32,7 @@ export function Chat() {
       cleanup()
       socketClient.disconnect()
     }
-  }, [fetchConversations])
+  }, [fetchConversations, user])
 
   useEffect(() => {
     if (window.innerWidth < 1024) {

@@ -97,10 +97,12 @@ export interface UserDetailResponse extends UserResponse {
 
 export interface UserPublicResponse {
   id: string;
+  email?: string;
   username: string;
   avatarUrl: string | null;
   isOnline: boolean;
   lastSeen: Date | null;
+  createdAt?: Date;
 }
 
 // =========================================

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useRef, useEffect } from 'react'
 import { Pin, PinOff, VolumeX, Volume2, Trash2, UserX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getOtherMember } from '@/utils/conversation'
@@ -43,7 +43,7 @@ export function ConversationItem({
   onDelete,
   onRemove
 }: ConversationItemProps) {
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0
 
   const otherMember = getOtherMember(conversation.members, currentUserId)

@@ -7,28 +7,109 @@ import type {
   MessageResponse,
   CreateConversationRequest
 } from '@/types/chat'
-import { mockConversations, mockMessages } from '@/data/mock-chat'
+import { socketClient } from '@/lib/socket'
+import type { User } from '@/types/auth'
 
-const USE_MOCK = true
+interface SocketSendResponse {
+  success: boolean
+  message?: Message
+  error?: string
+}
+
+type ApiUser = Partial<User> & {
+  id: string
+  username: string
+  email?: string
+  avatarUrl: string | null
+}
+
+type ApiConversationMember = {
+  id?: string
+  userId?: string
+  conversationId?: string
+  joinedAt?: string
+  user: ApiUser
+}
+
+type ApiConversation = Omit<Conversation, 'members' | 'isGroup'> & {
+  type?: 'direct' | 'group'
+  members: ApiConversationMember[]
+  isGroup?: boolean
+}
+
+type ApiMessage = Omit<Message, 'content' | 'sender'> & {
+  content: string | null
+  sender: ApiUser | null
+}
+
+function normalizeUser(user: ApiUser): User {
+  return {
+    id: user.id,
+    email: user.email ?? '',
+    username: user.username,
+    avatarUrl: user.avatarUrl ?? null,
+    phone: user.phone ?? null,
+    dateOfBirth: user.dateOfBirth ?? null,
+    bio: user.bio ?? null,
+    isOnline: user.isOnline ?? false,
+    lastSeen: user.lastSeen ?? null,
+    createdAt: user.createdAt ?? ''
+  }
+}
+
+export function normalizeMessage(message: ApiMessage): Message {
+  const fallbackSender: ApiUser = {
+    id: message.senderId,
+    username: 'Unknown',
+    email: '',
+    avatarUrl: null
+  }
+
+  return {
+    ...message,
+    content: message.content ?? '',
+    sender: normalizeUser(message.sender ?? fallbackSender),
+    updatedAt: message.updatedAt ?? message.createdAt
+  }
+}
+
+export function normalizeConversation(
+  conversation: ApiConversation
+): Conversation {
+  const lastMessage = conversation.lastMessage
+    ? normalizeMessage(conversation.lastMessage as ApiMessage)
+    : null
+
+  return {
+    ...conversation,
+    isGroup: conversation.isGroup ?? conversation.type === 'group',
+    members: conversation.members.map((member) => ({
+      id: member.id ?? `${conversation.id}:${member.user.id}`,
+      userId: member.userId ?? member.user.id,
+      conversationId: member.conversationId ?? conversation.id,
+      joinedAt: member.joinedAt ?? conversation.createdAt,
+      user: normalizeUser(member.user)
+    })),
+    lastMessage,
+    updatedAt:
+      conversation.updatedAt ?? lastMessage?.createdAt ?? conversation.createdAt
+  }
+}
 
 export const chatService = {
   async getConversations(): Promise<Conversation[]> {
-    if (USE_MOCK) {
-      return mockConversations
-    }
     const response = await apiClient.get<ConversationResponse>('/conversations')
 
     if (!response.data.success) {
       throw new Error(response.data.error || 'Failed to fetch conversations')
     }
 
-    return response.data.data || []
+    return ((response.data.data || []) as ApiConversation[]).map(
+      normalizeConversation
+    )
   },
 
   async getMessages(conversationId: string): Promise<Message[]> {
-    if (USE_MOCK) {
-      return mockMessages[conversationId] ?? []
-    }
     const response = await apiClient.get<MessagesResponse>(
       `/conversations/${conversationId}/messages`
     )
@@ -37,7 +118,7 @@ export const chatService = {
       throw new Error(response.data.error || 'Failed to fetch messages')
     }
 
-    return response.data.data || []
+    return ((response.data.data || []) as ApiMessage[]).map(normalizeMessage)
   },
 
   async createConversation(
@@ -59,20 +140,37 @@ export const chatService = {
     return response.data.data as unknown as Conversation
   },
 
-  async sendMessage(conversationId: string, content: string): Promise<Message> {
+  async createDirectConversation(friendId: string): Promise<Conversation> {
     const response = await apiClient.post<MessageResponse>(
-      `/conversations/${conversationId}/messages`,
-      { content }
+      '/conversations/direct',
+      { friendId }
     )
 
     if (!response.data.success) {
-      throw new Error(response.data.error || 'Failed to send message')
+      throw new Error(response.data.error || 'Failed to create conversation')
     }
 
     if (!response.data.data) {
       throw new Error('No data returned from server')
     }
 
-    return response.data.data
+    return normalizeConversation(response.data.data as unknown as ApiConversation)
+  },
+
+  async sendMessage(conversationId: string, content: string): Promise<Message> {
+    const response = await socketClient.emitWithAck<SocketSendResponse>(
+      'message:send',
+      { conversationId, content }
+    )
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to send message')
+    }
+
+    if (!response.message) {
+      throw new Error('No data returned from server')
+    }
+
+    return normalizeMessage(response.message as ApiMessage)
   }
 }

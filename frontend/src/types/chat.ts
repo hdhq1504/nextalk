@@ -3,6 +3,7 @@ import type { User } from '@/types/auth'
 export interface Conversation {
   id: string
   name: string | null
+  type?: 'direct' | 'group'
   isGroup: boolean
   members: ConversationMember[]
   lastMessage: Message | null
@@ -52,6 +53,10 @@ export interface MessageResponse {
 export interface CreateConversationRequest {
   memberIds: string[]
   name?: string
+}
+
+export interface CreateDirectConversationRequest {
+  friendId: string
 }
 
 export interface SendMessageRequest {

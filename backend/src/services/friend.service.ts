@@ -6,6 +6,7 @@ export interface UserSearchResult {
   username: string;
   email: string;
   avatarUrl: string | null;
+  createdAt: Date;
 }
 
 export interface FriendRequestResponse {
@@ -43,6 +44,7 @@ export class FriendService {
         username: true,
         email: true,
         avatarUrl: true,
+        createdAt: true,
       },
       take: 20,
     });
@@ -102,6 +104,7 @@ export class FriendService {
             username: true,
             email: true,
             avatarUrl: true,
+            createdAt: true,
           },
         },
       },
@@ -123,6 +126,7 @@ export class FriendService {
             username: true,
             email: true,
             avatarUrl: true,
+            createdAt: true,
           },
         },
       },
@@ -174,6 +178,7 @@ export class FriendService {
             username: true,
             email: true,
             avatarUrl: true,
+            createdAt: true,
           },
         },
       },
@@ -209,6 +214,7 @@ export class FriendService {
             username: true,
             email: true,
             avatarUrl: true,
+            createdAt: true,
           },
         },
       },
@@ -227,6 +233,7 @@ export class FriendService {
             username: true,
             email: true,
             avatarUrl: true,
+            createdAt: true,
           },
         },
       },
@@ -243,6 +250,7 @@ export class FriendService {
         username: f.friend.username,
         email: f.friend.email,
         avatarUrl: f.friend.avatarUrl,
+        createdAt: f.friend.createdAt,
       },
       createdAt: f.createdAt,
     }));
@@ -269,6 +277,7 @@ export class FriendService {
       username: string;
       email: string;
       avatarUrl: string | null;
+      createdAt: Date;
     };
   }): FriendRequestResponse {
     return {
@@ -281,6 +290,7 @@ export class FriendService {
         username: request.sender.username,
         email: request.sender.email,
         avatarUrl: request.sender.avatarUrl,
+        createdAt: request.sender.createdAt,
       },
       createdAt: request.createdAt,
     };

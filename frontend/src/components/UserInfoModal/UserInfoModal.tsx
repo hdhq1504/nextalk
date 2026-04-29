@@ -1,8 +1,11 @@
+import { useEffect, useMemo, useState } from 'react'
 import { X, Mail, Calendar, UserPlus, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getOtherMember } from '@/utils/conversation'
+import { friendService } from '@/services/friend.service'
 import type { Conversation } from '@/types/chat'
 import type { User } from '@/types/auth'
+import type { UserSearchResult } from '@/types/friend'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
@@ -16,6 +19,8 @@ interface UserInfoModalProps {
 }
 
 function formatDate(dateString: string): string {
+  if (!dateString) return '-'
+
   return new Date(dateString).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -30,18 +35,58 @@ export function UserInfoModal({
   onClose,
   onAddFriend
 }: UserInfoModalProps) {
+  const [friendDetails, setFriendDetails] = useState<UserSearchResult | null>(
+    null
+  )
+
+  const otherMember = useMemo(
+    () =>
+      conversation ? getOtherMember(conversation.members, currentUserId) : null,
+    [conversation, currentUserId]
+  )
+
+  useEffect(() => {
+    if (!open || !otherMember?.userId || conversation?.isGroup) {
+      setFriendDetails(null)
+      return
+    }
+
+    let isMounted = true
+
+    friendService
+      .getFriends()
+      .then((friends) => {
+        if (!isMounted) return
+        const matchedFriend = friends.find(
+          (friend) => friend.friendId === otherMember.userId
+        )
+        setFriendDetails(matchedFriend?.friend ?? null)
+      })
+      .catch(() => {
+        if (isMounted) setFriendDetails(null)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [conversation?.isGroup, open, otherMember?.userId])
+
   if (!open || !conversation) return null
 
-  const otherMember = getOtherMember(conversation.members, currentUserId)
+  const contactUser = {
+    ...otherMember?.user,
+    ...friendDetails
+  } as User
   const displayName =
     conversation.name ||
-    otherMember?.user.username ||
-    otherMember?.user.email ||
+    contactUser.username ||
+    contactUser.email ||
     'Unknown'
 
-  const avatarUrl = otherMember?.user.avatarUrl
+  const avatarUrl = contactUser.avatarUrl
   const initials = displayName.slice(0, 2).toUpperCase()
   const isGroup = conversation.isGroup
+  const canShowFriendActions = false
 
   const renderUserInfo = (user: User) => (
     <div className='flex flex-col items-center gap-3'>
@@ -105,7 +150,7 @@ export function UserInfoModal({
 
         {/* Content */}
         <div className='max-h-[60vh] overflow-y-auto p-4 sm:max-h-none'>
-          {isGroup ? renderGroupInfo() : renderUserInfo(otherMember!.user)}
+          {isGroup ? renderGroupInfo() : renderUserInfo(contactUser)}
 
           <Separator className='my-4' />
 
@@ -117,19 +162,17 @@ export function UserInfoModal({
                   <Mail className='text-muted-foreground size-4' />
                   <span className='text-muted-foreground'>Email</span>
                   <span className='ml-auto truncate'>
-                    {otherMember?.user.email || '-'}
+                    {contactUser.email || '-'}
                   </span>
                 </div>
 
-                {otherMember?.joinedAt && (
-                  <div className='flex items-center gap-3 text-sm'>
-                    <Calendar className='text-muted-foreground size-4' />
-                    <span className='text-muted-foreground'>Joined</span>
-                    <span className='ml-auto'>
-                      {formatDate(otherMember.joinedAt)}
-                    </span>
-                  </div>
-                )}
+                <div className='flex items-center gap-3 text-sm'>
+                  <Calendar className='text-muted-foreground size-4' />
+                  <span className='text-muted-foreground'>Joined</span>
+                  <span className='ml-auto'>
+                    {formatDate(contactUser.createdAt || '')}
+                  </span>
+                </div>
               </>
             )}
 
@@ -173,12 +216,10 @@ export function UserInfoModal({
             )}
           </div>
 
-          <Separator className='my-4' />
-
-          {/* Actions */}
-          <div className='flex gap-2'>
-            {!isGroup && otherMember?.userId && (
-              <>
+          {!isGroup && canShowFriendActions && otherMember?.userId && (
+            <>
+              <Separator className='my-4' />
+              <div className='flex gap-2'>
                 <Button
                   variant='outline'
                   className='flex-1'
@@ -194,9 +235,9 @@ export function UserInfoModal({
                   <Check className='mr-2 size-4' />
                   Accept
                 </Button>
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </>

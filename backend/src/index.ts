@@ -1,10 +1,13 @@
 import app from './app';
 import prisma from './config/database';
 import { config } from 'dotenv';
+import { createServer } from 'http';
+import { initSocket } from './socket';
 
 config();
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
+const httpServer = createServer(app);
 
 async function main() {
   try {
@@ -12,8 +15,10 @@ async function main() {
     await prisma.$connect();
     console.log('✅ Database connected successfully');
 
+    initSocket(httpServer);
+
     // Start Server
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
       console.log(`📚 API Documentation: http://localhost:${PORT}/api`);
     });

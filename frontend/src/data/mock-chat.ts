@@ -7,6 +7,11 @@ export const mockUsers: User[] = [
     email: 'alice@example.com',
     username: 'Alice Johnson',
     avatarUrl: 'https://i.pravatar.cc/150?img=1',
+    phone: null,
+    dateOfBirth: null,
+    bio: null,
+    isOnline: false,
+    lastSeen: null,
     createdAt: '2024-01-15T08:00:00Z'
   },
   {
@@ -14,6 +19,11 @@ export const mockUsers: User[] = [
     email: 'bob@example.com',
     username: 'Bob Smith',
     avatarUrl: 'https://i.pravatar.cc/150?img=2',
+    phone: null,
+    dateOfBirth: null,
+    bio: null,
+    isOnline: false,
+    lastSeen: null,
     createdAt: '2024-01-16T09:00:00Z'
   },
   {
@@ -21,6 +31,11 @@ export const mockUsers: User[] = [
     email: 'carol@example.com',
     username: 'Carol Davis',
     avatarUrl: 'https://i.pravatar.cc/150?img=3',
+    phone: null,
+    dateOfBirth: null,
+    bio: null,
+    isOnline: false,
+    lastSeen: null,
     createdAt: '2024-01-17T10:00:00Z'
   },
   {
@@ -28,6 +43,11 @@ export const mockUsers: User[] = [
     email: 'david@example.com',
     username: 'David Wilson',
     avatarUrl: 'https://i.pravatar.cc/150?img=4',
+    phone: null,
+    dateOfBirth: null,
+    bio: null,
+    isOnline: false,
+    lastSeen: null,
     createdAt: '2024-01-18T11:00:00Z'
   },
   {
@@ -35,6 +55,11 @@ export const mockUsers: User[] = [
     email: 'emma@example.com',
     username: 'Emma Brown',
     avatarUrl: null,
+    phone: null,
+    dateOfBirth: null,
+    bio: null,
+    isOnline: false,
+    lastSeen: null,
     createdAt: '2024-01-19T12:00:00Z'
   }
 ]
