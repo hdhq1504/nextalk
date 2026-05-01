@@ -1,3 +1,1 @@
-import { FriendRequestModal } from './FriendRequestModal'
-
-export default FriendRequestModal
+export { FriendRequestModal } from './FriendRequestModal'

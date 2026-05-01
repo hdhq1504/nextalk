@@ -1,4 +1,4 @@
-import SignUpForm from '@/components/SignUpForm'
+import { SignUpForm } from '@/components/SignUpForm'
 import AuthLayout from '@/layouts'
 
 export default function SignUpPage() {

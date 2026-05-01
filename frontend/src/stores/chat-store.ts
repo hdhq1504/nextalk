@@ -5,7 +5,7 @@ import {
   normalizeMessage
 } from '@/services/chat.service'
 import { socketClient } from '@/lib/socket'
-import type { Conversation, Message } from '@/types/chat'
+import type { Conversation, Message, ReactionSummary } from '@/types/chat'
 
 interface ChatState {
   conversations: Conversation[]
@@ -14,12 +14,23 @@ interface ChatState {
   isLoading: boolean
   isMessagesLoading: boolean
   error: string | null
+  replyingTo: Message | null
 
   fetchConversations: () => Promise<Conversation[]>
   setActiveConversation: (conversation: Conversation | null) => void
   fetchMessages: (conversationId: string) => Promise<void>
   createDirectConversation: (friendId: string) => Promise<Conversation>
-  sendMessage: (conversationId: string, content: string) => Promise<void>
+  sendMessage: (
+    conversationId: string,
+    content: string,
+    replyToId?: string
+  ) => Promise<void>
+  sendImageMessage: (
+    conversationId: string,
+    file: File,
+    content?: string,
+    replyToId?: string
+  ) => Promise<void>
   addMessage: (message: Message) => void
   upsertConversation: (conversation: Conversation) => void
   updateConversationLastMessage: (
@@ -27,6 +38,19 @@ interface ChatState {
     message: Message
   ) => void
   clearError: () => void
+  setReplyingTo: (message: Message | null) => void
+  recallMessage: (messageId: string) => Promise<void>
+  reactToMessage: (messageId: string, emoji: string) => Promise<void>
+  updateMessage: (
+    messageId: string,
+    conversationId: string,
+    patch: Partial<Message>
+  ) => void
+  updateMessageReactions: (
+    messageId: string,
+    conversationId: string,
+    reactions: ReactionSummary[]
+  ) => void
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -36,6 +60,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isLoading: false,
   isMessagesLoading: false,
   error: null,
+  replyingTo: null,
 
   fetchConversations: async () => {
     set({ isLoading: true, error: null })
@@ -57,16 +82,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setActiveConversation: (conversation) => {
     const currentConversation = get().activeConversation
-    if (currentConversation?.id && currentConversation.id !== conversation?.id) {
+    if (
+      currentConversation?.id &&
+      currentConversation.id !== conversation?.id
+    ) {
       socketClient.emit('conversation:leave', {
         conversationId: currentConversation.id
       })
     }
 
-    set({ activeConversation: conversation })
+    set({ activeConversation: conversation, replyingTo: null })
 
     if (conversation) {
-      socketClient.emit('conversation:join', { conversationId: conversation.id })
+      socketClient.emit('conversation:join', {
+        conversationId: conversation.id
+      })
     }
   },
 
@@ -108,14 +138,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (conversationId, content) => {
+  sendMessage: async (conversationId, content, replyToId) => {
     try {
-      const message = await chatService.sendMessage(conversationId, content)
+      const message = await chatService.sendMessage(
+        conversationId,
+        content,
+        replyToId
+      )
       get().addMessage(message)
       get().updateConversationLastMessage(conversationId, message)
+      set({ replyingTo: null })
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to send message'
+      })
+      throw error
+    }
+  },
+
+  sendImageMessage: async (conversationId, file, content, replyToId) => {
+    try {
+      const message = await chatService.sendImageMessage(
+        conversationId,
+        file,
+        content,
+        replyToId
+      )
+      get().addMessage(message)
+      get().updateConversationLastMessage(conversationId, message)
+      set({ replyingTo: null })
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to send image'
       })
       throw error
     }
@@ -184,12 +238,70 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   clearError: () => {
     set({ error: null })
+  },
+
+  setReplyingTo: (message) => {
+    set({ replyingTo: message })
+  },
+
+  recallMessage: async (messageId) => {
+    try {
+      await chatService.recallMessage(messageId)
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error ? error.message : 'Failed to recall message'
+      })
+      throw error
+    }
+  },
+
+  reactToMessage: async (messageId, emoji) => {
+    try {
+      await chatService.reactMessage(messageId, emoji)
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error ? error.message : 'Failed to react to message'
+      })
+      throw error
+    }
+  },
+
+  updateMessage: (messageId, conversationId, patch) => {
+    set((state) => {
+      const messages = state.messages[conversationId] || []
+      return {
+        messages: {
+          ...state.messages,
+          [conversationId]: messages.map((m) =>
+            m.id === messageId ? { ...m, ...patch } : m
+          )
+        }
+      }
+    })
+  },
+
+  updateMessageReactions: (messageId, conversationId, reactions) => {
+    set((state) => {
+      const messages = state.messages[conversationId] || []
+      return {
+        messages: {
+          ...state.messages,
+          [conversationId]: messages.map((m) =>
+            m.id === messageId ? { ...m, reactions } : m
+          )
+        }
+      }
+    })
   }
 }))
 
 export function initializeSocketListeners(): () => void {
   const handleNewMessage = (rawMessage: unknown) => {
-    const message = normalizeMessage(rawMessage as Parameters<typeof normalizeMessage>[0])
+    const message = normalizeMessage(
+      rawMessage as Parameters<typeof normalizeMessage>[0]
+    )
     useChatStore.getState().addMessage(message)
     useChatStore
       .getState()
@@ -206,11 +318,38 @@ export function initializeSocketListeners(): () => void {
       )
   }
 
+  const handleMessageRecall = (data: unknown) => {
+    const { messageId, conversationId } = data as {
+      messageId: string
+      conversationId: string
+    }
+    useChatStore.getState().updateMessage(messageId, conversationId, {
+      isDeleted: true,
+      content: null,
+      imageUrl: null
+    })
+  }
+
+  const handleMessageReact = (data: unknown) => {
+    const { messageId, conversationId, reactions } = data as {
+      messageId: string
+      conversationId: string
+      reactions: ReactionSummary[]
+    }
+    useChatStore
+      .getState()
+      .updateMessageReactions(messageId, conversationId, reactions)
+  }
+
   socketClient.on('message:new', handleNewMessage)
   socketClient.on('conversation:update', handleConversationUpdate)
+  socketClient.on('message:recall', handleMessageRecall)
+  socketClient.on('message:react', handleMessageReact)
 
   return () => {
     socketClient.off('message:new', handleNewMessage)
     socketClient.off('conversation:update', handleConversationUpdate)
+    socketClient.off('message:recall', handleMessageRecall)
+    socketClient.off('message:react', handleMessageReact)
   }
 }

@@ -78,17 +78,14 @@ export function UserInfoModal({
     ...friendDetails
   } as User
   const displayName =
-    conversation.name ||
-    contactUser.username ||
-    contactUser.email ||
-    'Unknown'
+    conversation.name || contactUser.username || contactUser.email || 'Unknown'
 
   const avatarUrl = contactUser.avatarUrl
   const initials = displayName.slice(0, 2).toUpperCase()
   const isGroup = conversation.isGroup
   const canShowFriendActions = false
 
-  const renderUserInfo = (user: User) => (
+  const renderUserInfo = () => (
     <div className='flex flex-col items-center gap-3'>
       <Avatar size='lg'>
         {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
@@ -96,9 +93,6 @@ export function UserInfoModal({
       </Avatar>
       <div className='text-center'>
         <h3 className='text-lg font-medium'>{displayName}</h3>
-        {user.email && (
-          <p className='text-muted-foreground text-sm'>{user.email}</p>
-        )}
       </div>
     </div>
   )
@@ -150,7 +144,7 @@ export function UserInfoModal({
 
         {/* Content */}
         <div className='max-h-[60vh] overflow-y-auto p-4 sm:max-h-none'>
-          {isGroup ? renderGroupInfo() : renderUserInfo(contactUser)}
+          {isGroup ? renderGroupInfo() : renderUserInfo()}
 
           <Separator className='my-4' />
 

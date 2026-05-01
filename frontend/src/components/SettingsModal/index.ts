@@ -1,3 +1,1 @@
-import { SettingsModal } from './SettingsModal'
-
-export default SettingsModal
+export { SettingsModal } from './SettingsModal'

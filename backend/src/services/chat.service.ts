@@ -1,4 +1,5 @@
 import prisma from '../config/database'
+import { uploadImageBuffer } from '../config/cloudinary'
 import {
   AuthorizationError,
   ConflictError,
@@ -12,6 +13,7 @@ import {
   MemberRole,
   MessageResponse,
   MessageType,
+  ReactionSummary,
 } from '../types'
 
 const userSelect = {
@@ -27,6 +29,16 @@ const userSelect = {
 const messageInclude = {
   sender: {
     select: userSelect,
+  },
+  replyTo: {
+    include: {
+      sender: { select: userSelect },
+    },
+  },
+  reactions: {
+    include: {
+      user: { select: { id: true } },
+    },
   },
 } as const
 
@@ -151,7 +163,8 @@ class ChatService {
   async sendMessage(
     conversationId: string,
     senderId: string,
-    content: string
+    content: string,
+    replyToId?: string
   ): Promise<MessageResponse> {
     const trimmedContent = content.trim()
     if (!trimmedContent) {
@@ -160,17 +173,173 @@ class ChatService {
 
     await this.assertConversationMember(conversationId, senderId)
 
+    if (replyToId) {
+      const replyMessage = await prisma.message.findUnique({
+        where: { id: replyToId },
+        select: { conversationId: true },
+      })
+      if (!replyMessage) {
+        throw new NotFoundError('Reply message not found')
+      }
+      if (replyMessage.conversationId !== conversationId) {
+        throw new ValidationError('Cannot reply to a message in a different conversation')
+      }
+    }
+
     const message = await prisma.message.create({
       data: {
         conversationId,
         senderId,
         content: trimmedContent,
         type: MessageType.Text,
+        replyToId,
       },
       include: messageInclude,
     })
 
     return this.formatMessage(message)
+  }
+
+  async sendImageMessage(
+    conversationId: string,
+    senderId: string,
+    imageBuffer: Buffer,
+    mimeType: string,
+    content?: string,
+    replyToId?: string
+  ): Promise<MessageResponse> {
+    await this.assertConversationMember(conversationId, senderId)
+    const trimmedContent = content?.trim() || null
+
+    if (replyToId) {
+      const replyMessage = await prisma.message.findUnique({
+        where: { id: replyToId },
+        select: { conversationId: true },
+      })
+      if (!replyMessage) {
+        throw new NotFoundError('Reply message not found')
+      }
+      if (replyMessage.conversationId !== conversationId) {
+        throw new ValidationError('Cannot reply to a message in a different conversation')
+      }
+    }
+
+    const uploadResult = await uploadImageBuffer(imageBuffer, 'nextalk/messages')
+
+    const message = await prisma.message.create({
+      data: {
+        conversationId,
+        senderId,
+        content: trimmedContent,
+        type: MessageType.Image,
+        imageUrl: uploadResult.url,
+        replyToId,
+      },
+      include: messageInclude,
+    })
+
+    return this.formatMessage(message)
+  }
+
+  async recallMessage(
+    messageId: string,
+    requesterId: string
+  ): Promise<MessageResponse> {
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: messageInclude,
+    })
+
+    if (!message) {
+      throw new NotFoundError('Message not found')
+    }
+
+    if (message.senderId !== requesterId) {
+      throw new AuthorizationError('You can only recall your own messages')
+    }
+
+    if (message.isDeleted) {
+      throw new ConflictError('Message has already been recalled')
+    }
+
+    const updated = await prisma.message.update({
+      where: { id: messageId },
+      data: {
+        isDeleted: true,
+        content: null,
+        imageUrl: null,
+      },
+      include: messageInclude,
+    })
+
+    return this.formatMessage(updated)
+  }
+
+  async reactMessage(
+    messageId: string,
+    userId: string,
+    emoji: string
+  ): Promise<{ conversationId: string; reactions: ReactionSummary[] }> {
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      select: { conversationId: true },
+    })
+
+    if (!message) {
+      throw new NotFoundError('Message not found')
+    }
+
+    await this.assertConversationMember(message.conversationId, userId)
+
+    const existingReaction = await prisma.messageReaction.findUnique({
+      where: {
+        messageId_userId_emoji: {
+          messageId,
+          userId,
+          emoji,
+        },
+      },
+    })
+
+    if (existingReaction) {
+      await prisma.messageReaction.delete({
+        where: { id: existingReaction.id },
+      })
+    } else {
+      await prisma.messageReaction.create({
+        data: {
+          messageId,
+          userId,
+          emoji,
+        },
+      })
+    }
+
+    const reactions = await prisma.messageReaction.findMany({
+      where: { messageId },
+      include: { user: { select: { id: true } } },
+    })
+
+    const reactionSummary = this.calculateReactionsFromArray(reactions)
+
+    return { conversationId: message.conversationId, reactions: reactionSummary }
+  }
+
+  private calculateReactionsFromArray(reactions: { emoji: string; user: { id: string } }[]): ReactionSummary[] {
+    const reactionMap = new Map<string, { count: number; userIds: string[] }>()
+
+    for (const reaction of reactions) {
+      const existing = reactionMap.get(reaction.emoji) || { count: 0, userIds: [] }
+      existing.count++
+      existing.userIds.push(reaction.user.id)
+      reactionMap.set(reaction.emoji, existing)
+    }
+
+    return Array.from(reactionMap.entries()).map(([emoji, data]) => ({
+      emoji,
+      count: data.count,
+      userIds: data.userIds,
+    }))
   }
 
   async getConversationForMember(
@@ -259,17 +428,24 @@ class ChatService {
     }
   }
 
-  private formatMessage(message: MessageWithSender): MessageResponse {
+  private formatMessage(message: unknown): MessageResponse {
+    const msg = message as MessageWithRelations
+    const reactions = msg.reactions ? this.calculateReactionsFromArray(msg.reactions) : undefined
+
     return {
-      id: message.id,
-      conversationId: message.conversationId,
-      senderId: message.senderId,
-      content: message.content,
-      type: message.type as MessageType,
-      createdAt: message.createdAt,
-      updatedAt: message.updatedAt,
-      isDeleted: message.isDeleted,
-      sender: message.sender,
+      id: msg.id,
+      conversationId: msg.conversationId,
+      senderId: msg.senderId,
+      content: msg.content,
+      type: msg.type as MessageType,
+      createdAt: msg.createdAt,
+      updatedAt: msg.updatedAt,
+      isDeleted: msg.isDeleted,
+      sender: msg.sender,
+      replyToId: msg.replyToId ?? null,
+      imageUrl: msg.imageUrl ?? null,
+      replyTo: msg.replyTo ? this.formatMessage(msg.replyTo) : null,
+      reactions,
     }
   }
 }
@@ -284,14 +460,31 @@ const conversationIncludeArg = {
   include: conversationInclude,
 }
 
-type MessageWithSender = Awaited<
-  ReturnType<typeof prisma.message.findFirst<typeof messageIncludeArg>>
-> extends infer T
-  ? NonNullable<T>
-  : never
-
-const messageIncludeArg = {
-  include: messageInclude,
+type MessageWithRelations = {
+  id: string
+  conversationId: string
+  senderId: string | null
+  content: string | null
+  type: string
+  createdAt: Date
+  updatedAt: Date | null
+  isDeleted: boolean
+  replyToId: string | null
+  imageUrl: string | null
+  sender: {
+    id: string
+    email: string
+    username: string
+    avatarUrl: string | null
+    isOnline: boolean
+    lastSeen: Date | null
+    createdAt: Date
+  } | null
+  replyTo: unknown | null
+  reactions: {
+    emoji: string
+    user: { id: string }
+  }[]
 }
 
 export const chatService = new ChatService()

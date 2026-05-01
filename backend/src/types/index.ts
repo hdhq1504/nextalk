@@ -177,6 +177,12 @@ export interface ConversationListItem {
 // MESSAGE
 // =========================================
 
+export interface ReactionSummary {
+  emoji: string
+  count: number
+  userIds: string[]
+}
+
 export interface MessageResponse {
   id: string;
   conversationId: string;
@@ -191,12 +197,17 @@ export interface MessageResponse {
     userId: string;
     readAt: Date;
   }[];
+  replyToId?: string | null;
+  imageUrl?: string | null;
+  replyTo?: MessageResponse | null;
+  reactions?: ReactionSummary[];
 }
 
 export interface CreateMessageDto {
   conversationId: string;
   content: string;
   type?: MessageType;
+  replyToId?: string;
 }
 
 // =========================================
@@ -219,6 +230,8 @@ export interface ServerToClientEvents {
   'message:update': (message: MessageResponse) => void;
   'message:delete': (data: { messageId: string; conversationId: string }) => void;
   'message:read': (data: { messageId: string; userId: string; readAt: Date }) => void;
+  'message:recall': (data: { messageId: string; conversationId: string }) => void;
+  'message:react': (data: { messageId: string; conversationId: string; reactions: ReactionSummary[] }) => void;
   'user:typing': (data: { userId: string; username: string; isTyping: boolean }) => void;
   'user:online': (data: { userId: string; isOnline: boolean }) => void;
   'conversation:update': (conversation: ConversationResponse) => void;
@@ -229,6 +242,8 @@ export interface ServerToClientEvents {
 
 export interface ClientToServerEvents {
   'message:send': (data: CreateMessageDto, callback?: (response: { success: boolean; message?: MessageResponse; error?: string }) => void) => void;
+  'message:recall': (data: { messageId: string }, callback?: (response: { success: boolean; error?: string }) => void) => void;
+  'message:react': (data: { messageId: string; emoji: string }, callback?: (response: { success: boolean; error?: string }) => void) => void;
   'message:typing_start': (data: { conversationId: string }) => void;
   'message:typing_stop': (data: { conversationId: string }) => void;
   'message:read': (data: { messageId: string; conversationId: string }) => void;

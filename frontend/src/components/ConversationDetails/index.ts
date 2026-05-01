@@ -1,3 +1,1 @@
-import { ConversationDetails } from './ConversationDetails'
-
-export default ConversationDetails
+export { ConversationDetails } from './ConversationDetails'

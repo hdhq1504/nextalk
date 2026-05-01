@@ -8,6 +8,9 @@ type ChatSocket = Socket<ClientToServerEvents, ServerToClientEvents> & {
   userId?: string
 }
 
+let ioInstance: SocketIOServer<ClientToServerEvents, ServerToClientEvents> | null =
+  null
+
 export function initSocket(httpServer: Server) {
   const io = new SocketIOServer<ClientToServerEvents, ServerToClientEvents>(
     httpServer,
@@ -18,6 +21,7 @@ export function initSocket(httpServer: Server) {
       },
     }
   )
+  ioInstance = io
 
   io.use((socket: ChatSocket, next) => {
     try {
@@ -67,7 +71,8 @@ export function initSocket(httpServer: Server) {
         const message = await chatService.sendMessage(
           data.conversationId,
           socket.userId!,
-          data.content
+          data.content,
+          data.replyToId
         )
         const conversation = await chatService.getConversationForMember(
           data.conversationId,
@@ -85,16 +90,42 @@ export function initSocket(httpServer: Server) {
         callback?.({ success: false, error: getErrorMessage(error) })
       }
     })
+
+    socket.on('message:recall', async ({ messageId }, callback) => {
+      try {
+        const message = await chatService.recallMessage(messageId, socket.userId!)
+        const room = getConversationRoom(message.conversationId)
+        io.to(room).emit('message:recall', { messageId, conversationId: message.conversationId })
+        callback?.({ success: true })
+      } catch (error) {
+        callback?.({ success: false, error: getErrorMessage(error) })
+      }
+    })
+
+    socket.on('message:react', async ({ messageId, emoji }, callback) => {
+      try {
+        const { conversationId, reactions } = await chatService.reactMessage(messageId, socket.userId!, emoji)
+        const room = getConversationRoom(conversationId)
+        io.to(room).emit('message:react', { messageId, conversationId, reactions })
+        callback?.({ success: true })
+      } catch (error) {
+        callback?.({ success: false, error: getErrorMessage(error) })
+      }
+    })
   })
 
   return io
 }
 
-function getConversationRoom(conversationId: string): string {
+export function getSocketServer() {
+  return ioInstance
+}
+
+export function getConversationRoom(conversationId: string): string {
   return `conversation:${conversationId}`
 }
 
-function getUserRoom(userId: string): string {
+export function getUserRoom(userId: string): string {
   return `user:${userId}`
 }
 

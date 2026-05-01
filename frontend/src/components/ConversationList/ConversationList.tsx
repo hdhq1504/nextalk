@@ -97,7 +97,7 @@ export function ConversationList({
       {/* Search */}
       <div className='shrink-0 border-b p-3'>
         <div className='mb-3 flex items-center justify-between gap-2'>
-          <h2 className='text-sm font-medium'>Chats</h2>
+          <h2 className='text-sm font-medium'>NexTalk</h2>
           <Button
             type='button'
             size='icon-sm'

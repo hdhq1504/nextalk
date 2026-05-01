@@ -1,5 +1,11 @@
 import type { User } from '@/types/auth'
 
+export interface ReactionSummary {
+  emoji: string
+  count: number
+  userIds: string[]
+}
+
 export interface Conversation {
   id: string
   name: string | null
@@ -21,12 +27,18 @@ export interface ConversationMember {
 
 export interface Message {
   id: string
-  content: string
+  content: string | null
   senderId: string
   sender: User
   conversationId: string
   createdAt: string
   updatedAt: string
+  type?: 'text' | 'image' | 'file'
+  isDeleted?: boolean
+  imageUrl?: string | null
+  replyToId?: string | null
+  replyTo?: Message | null
+  reactions?: ReactionSummary[]
 }
 
 export interface ConversationResponse {

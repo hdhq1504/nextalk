@@ -5,7 +5,8 @@ import type {
   ConversationResponse,
   MessagesResponse,
   MessageResponse,
-  CreateConversationRequest
+  CreateConversationRequest,
+  ReactionSummary
 } from '@/types/chat'
 import { socketClient } from '@/lib/socket'
 import type { User } from '@/types/auth'
@@ -42,6 +43,12 @@ type ApiMessage = Omit<Message, 'content' | 'sender'> & {
   sender: ApiUser | null
 }
 
+type ApiReactionSummary = {
+  emoji: string
+  count: number
+  userIds: string[]
+}
+
 function normalizeUser(user: ApiUser): User {
   return {
     id: user.id,
@@ -57,6 +64,14 @@ function normalizeUser(user: ApiUser): User {
   }
 }
 
+function normalizeReaction(reaction: ApiReactionSummary): ReactionSummary {
+  return {
+    emoji: reaction.emoji,
+    count: reaction.count,
+    userIds: reaction.userIds
+  }
+}
+
 export function normalizeMessage(message: ApiMessage): Message {
   const fallbackSender: ApiUser = {
     id: message.senderId,
@@ -65,12 +80,25 @@ export function normalizeMessage(message: ApiMessage): Message {
     avatarUrl: null
   }
 
-  return {
-    ...message,
+  const normalized: Message = {
+    id: message.id,
+    conversationId: message.conversationId,
+    senderId: message.senderId,
     content: message.content ?? '',
     sender: normalizeUser(message.sender ?? fallbackSender),
-    updatedAt: message.updatedAt ?? message.createdAt
+    createdAt: message.createdAt,
+    updatedAt: message.updatedAt ?? message.createdAt,
+    type: message.type ?? 'text',
+    isDeleted: message.isDeleted ?? false,
+    imageUrl: message.imageUrl ?? null,
+    replyToId: message.replyToId ?? null,
+    replyTo: message.replyTo
+      ? normalizeMessage(message.replyTo as ApiMessage)
+      : null,
+    reactions: message.reactions?.map(normalizeReaction)
   }
+
+  return normalized
 }
 
 export function normalizeConversation(
@@ -154,13 +182,19 @@ export const chatService = {
       throw new Error('No data returned from server')
     }
 
-    return normalizeConversation(response.data.data as unknown as ApiConversation)
+    return normalizeConversation(
+      response.data.data as unknown as ApiConversation
+    )
   },
 
-  async sendMessage(conversationId: string, content: string): Promise<Message> {
+  async sendMessage(
+    conversationId: string,
+    content: string,
+    replyToId?: string
+  ): Promise<Message> {
     const response = await socketClient.emitWithAck<SocketSendResponse>(
       'message:send',
-      { conversationId, content }
+      { conversationId, content, replyToId }
     )
 
     if (!response.success) {
@@ -172,5 +206,63 @@ export const chatService = {
     }
 
     return normalizeMessage(response.message as ApiMessage)
+  },
+
+  async sendImageMessage(
+    conversationId: string,
+    file: File,
+    content?: string,
+    replyToId?: string
+  ): Promise<Message> {
+    const formData = new FormData()
+    formData.append('image', file)
+    if (content?.trim()) {
+      formData.append('content', content.trim())
+    }
+    if (replyToId) {
+      formData.append('replyToId', replyToId)
+    }
+
+    const response = await apiClient.post<MessageResponse>(
+      `/conversations/${conversationId}/messages/image`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }
+    )
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to send image')
+    }
+
+    if (!response.data.data) {
+      throw new Error('No data returned from server')
+    }
+
+    return normalizeMessage(response.data.data as unknown as ApiMessage)
+  },
+
+  async recallMessage(messageId: string): Promise<void> {
+    const response = await socketClient.emitWithAck<{
+      success: boolean
+      error?: string
+    }>('message:recall', { messageId })
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to recall message')
+    }
+  },
+
+  async reactMessage(messageId: string, emoji: string): Promise<void> {
+    const response = await socketClient.emitWithAck<{
+      success: boolean
+      error?: string
+    }>('message:react', { messageId, emoji })
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to react to message')
+    }
   }
 }

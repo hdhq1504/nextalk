@@ -63,6 +63,7 @@ model User {
   conversationMemberships ConversationMember[] @relation("UserConversationMemberships")
   sentMessages            Message[] @relation("UserSentMessages")
   messageReads            MessageRead[] @relation("UserMessageReads")
+  messageReactions        MessageReaction[] @relation("UserMessageReactions")
 
   @@map("users")
   @@index([email])
@@ -165,11 +166,16 @@ model Message {
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime?   @map("updated_at")
   isDeleted      Boolean     @default(false) @map("is_deleted")
+  replyToId      String?     @map("reply_to_id")
+  imageUrl       String?     @map("image_url")
 
   // Relations
   conversation Conversation @relation("ConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User?        @relation("UserSentMessages", fields: [senderId], references: [id])
   readBy       MessageRead[] @relation("MessageReadStatus")
+  replyTo      Message?     @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies      Message[]    @relation("MessageReplies")
+  reactions    MessageReaction[] @relation("MessageReactions")
 
   @@map("messages")
   @@index([conversationId])
@@ -193,4 +199,24 @@ model MessageRead {
   @@unique([messageId, userId])
   @@map("message_reads")
   @@index([userId])
+}
+
+// =========================================
+// MESSAGE REACTIONS
+// =========================================
+
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")
+  emoji     String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message Message @relation("MessageReactions", fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation("UserMessageReactions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@map("message_reactions")
+  @@index([messageId])
 }

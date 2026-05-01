@@ -1,3 +1,1 @@
-import UserInfoModal from './UserInfoModal'
-
-export default UserInfoModal
+export { UserInfoModal } from './UserInfoModal'

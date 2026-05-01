@@ -1,3 +1,1 @@
-import { ConversationHeader } from './ConversationHeader.tsx'
-
-export default ConversationHeader
+export { ConversationHeader } from './ConversationHeader'

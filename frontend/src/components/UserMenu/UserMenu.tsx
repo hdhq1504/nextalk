@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/auth-store'
 import { friendService } from '@/services/friend.service'
-import SettingsModal from '@/components/SettingsModal'
-import FriendRequestModal from '@/components/FriendRequestModal'
+import { SettingsModal } from '@/components/SettingsModal'
+import { FriendRequestModal } from '@/components/FriendRequestModal'
 import {
   DropdownMenu,
   DropdownMenuContent,

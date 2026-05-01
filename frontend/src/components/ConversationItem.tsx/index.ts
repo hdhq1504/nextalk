@@ -1,3 +1,1 @@
-import { ConversationItem } from './ConversationItem'
-
-export default ConversationItem
+export { ConversationItem } from './ConversationItem'

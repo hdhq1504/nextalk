@@ -55,6 +55,11 @@ export function ConversationItem({
 
   const avatarUrl = otherMember?.user.avatarUrl
   const initials = displayName.slice(0, 2).toUpperCase()
+  const lastMessagePreview = conversation.lastMessage
+    ? conversation.lastMessage.type === 'image'
+      ? conversation.lastMessage.content || 'Ảnh'
+      : conversation.lastMessage.content
+    : null
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (isMobile) {
@@ -133,7 +138,7 @@ export function ConversationItem({
                   {conversation.lastMessage.senderId === currentUserId
                     ? 'You: '
                     : ''}
-                  {conversation.lastMessage.content}
+                  {lastMessagePreview}
                 </p>
               ) : (
                 <p className='text-muted-foreground flex items-center gap-1 text-xs'>
