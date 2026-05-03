@@ -88,13 +88,15 @@ class SocketClient {
     }
 
     return new Promise((resolve, reject) => {
-      socket.timeout(10000).emit(event, data, (error: Error | null, response: TResponse) => {
-        if (error) {
-          reject(error)
-          return
-        }
-        resolve(response)
-      })
+      socket
+        .timeout(10000)
+        .emit(event, data, (error: Error | null, response: TResponse) => {
+          if (error) {
+            reject(error)
+            return
+          }
+          resolve(response)
+        })
     })
   }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { isLongMessage } from '@/utils/conversation'
 import { formatMessageTime } from '@/utils/format'
@@ -16,8 +16,21 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import {
+  EMOJI_PICKER_HEIGHT,
+  PICKER_GAP,
+  PRESET_REACTION_EMOJIS,
+  REACTION_PICKER_HEIGHT,
+  REACTION_PICKER_POSITION_WIDTH,
+  VIEWPORT_MARGIN
+} from '@/constants/chat'
+import { ImageGrid } from '../ImageGrid'
 
-const PRESET_EMOJIS = ['❤️', '👍', '😂', '😢', '😮', '🔥']
+type ReactionPickerPosition = {
+  top: number
+  left: number
+  placement: 'top' | 'bottom'
+}
 
 interface MessageBubbleProps {
   message: Message
@@ -46,14 +59,23 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const [showActions, setShowActions] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
+  const [reactionPickerPosition, setReactionPickerPosition] =
+    useState<ReactionPickerPosition | null>(null)
   const [showRecallDialog, setShowRecallDialog] = useState(false)
+  const reactionButtonRef = useRef<HTMLButtonElement>(null)
   const { resolvedTheme } = useTheme()
   const emojiTheme = resolvedTheme === 'dark' ? Theme.DARK : Theme.LIGHT
 
   const initials = message.sender?.username?.slice(0, 2).toUpperCase() || '??'
   const isLong = isLongMessage(message.content || '')
   const isDeleted = message.isDeleted
-  const isImage = message.type === 'image' && message.imageUrl
+  const imageUrls =
+    message.imageUrls && message.imageUrls.length > 0
+      ? message.imageUrls
+      : message.imageUrl
+        ? [message.imageUrl]
+        : []
+  const isImage = message.type === 'image' && imageUrls.length > 0
 
   const handleReactionClick = (emoji: string) => {
     onReact(message.id, emoji)
@@ -64,6 +86,64 @@ export function MessageBubble({
     onReact(message.id, emojiData.emoji)
     setShowReactionPicker(false)
   }
+
+  const updateReactionPickerPosition = useCallback(() => {
+    const trigger = reactionButtonRef.current
+    if (!trigger) return
+
+    const rect = trigger.getBoundingClientRect()
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+    const expandedHeight =
+      REACTION_PICKER_HEIGHT + PICKER_GAP + EMOJI_PICKER_HEIGHT
+    const canOpenDown =
+      rect.bottom + PICKER_GAP + expandedHeight <=
+      viewportHeight - VIEWPORT_MARGIN
+    const canOpenUp = rect.top - PICKER_GAP - expandedHeight >= VIEWPORT_MARGIN
+    const placement = canOpenDown || !canOpenUp ? 'bottom' : 'top'
+
+    const preferredLeft = isOwn
+      ? rect.right - REACTION_PICKER_POSITION_WIDTH
+      : rect.left
+    const maxLeft =
+      viewportWidth - REACTION_PICKER_POSITION_WIDTH - VIEWPORT_MARGIN
+    const left = Math.min(
+      Math.max(preferredLeft, VIEWPORT_MARGIN),
+      Math.max(VIEWPORT_MARGIN, maxLeft)
+    )
+    const rawTop =
+      placement === 'bottom'
+        ? rect.bottom + PICKER_GAP
+        : rect.top - PICKER_GAP - REACTION_PICKER_HEIGHT
+    const top = Math.min(
+      Math.max(rawTop, VIEWPORT_MARGIN),
+      viewportHeight - REACTION_PICKER_HEIGHT - VIEWPORT_MARGIN
+    )
+
+    setReactionPickerPosition({ top, left, placement })
+  }, [isOwn])
+
+  const toggleReactionPicker = () => {
+    setShowReactionPicker((current) => {
+      if (!current) {
+        updateReactionPickerPosition()
+      }
+      return !current
+    })
+  }
+
+  useEffect(() => {
+    if (!showReactionPicker) return
+
+    updateReactionPickerPosition()
+    window.addEventListener('resize', updateReactionPickerPosition)
+    window.addEventListener('scroll', updateReactionPickerPosition, true)
+
+    return () => {
+      window.removeEventListener('resize', updateReactionPickerPosition)
+      window.removeEventListener('scroll', updateReactionPickerPosition, true)
+    }
+  }, [showReactionPicker, updateReactionPickerPosition])
 
   const handleRecall = async () => {
     await onRecall(message.id)
@@ -173,18 +253,8 @@ export function MessageBubble({
                 isOwn ? 'items-end' : 'items-start'
               )}
             >
-              <div
-                className={cn(
-                  'cursor-pointer overflow-hidden rounded-xl',
-                  isOwn ? 'bg-primary' : 'bg-secondary'
-                )}
-                onClick={() => onImageClick?.(message.imageUrl!)}
-              >
-                <img
-                  src={message.imageUrl!}
-                  alt='Shared image'
-                  className='max-h-[300px] max-w-[300px] object-cover'
-                />
+              <div className='overflow-hidden rounded-xl'>
+                <ImageGrid imageUrls={imageUrls} onImageClick={onImageClick} />
               </div>
               {message.content && (
                 <div
@@ -238,22 +308,24 @@ export function MessageBubble({
 
             <div className='relative'>
               <Button
+                ref={reactionButtonRef}
                 type='button'
                 variant='ghost'
                 size='icon'
                 className='h-6 w-6'
                 tabIndex={showActions ? 0 : -1}
-                onClick={() => setShowReactionPicker(!showReactionPicker)}
+                onClick={toggleReactionPicker}
               >
                 <Smile className='h-3.5 w-3.5' />
               </Button>
 
-              {showReactionPicker && (
+              {showReactionPicker && reactionPickerPosition && (
                 <div
-                  className={cn(
-                    'absolute top-full z-50 mt-2',
-                    isOwn ? 'right-0' : 'left-0'
-                  )}
+                  className='fixed z-50 w-max'
+                  style={{
+                    top: reactionPickerPosition.top,
+                    left: reactionPickerPosition.left
+                  }}
                 >
                   <div
                     className='fixed inset-0'
@@ -261,7 +333,7 @@ export function MessageBubble({
                   />
                   <div className='bg-background rounded-lg border p-2 shadow-lg'>
                     <div className='flex gap-1'>
-                      {PRESET_EMOJIS.map((emoji) => (
+                      {PRESET_REACTION_EMOJIS.map((emoji) => (
                         <button
                           key={emoji}
                           onClick={() => handleReactionClick(emoji)}
@@ -282,8 +354,11 @@ export function MessageBubble({
                         </Button>
                         <div
                           className={cn(
-                            'absolute top-full mt-2 hidden group-hover:block',
-                            isOwn ? 'right-0' : 'left-1/2 -translate-x-1/2'
+                            'absolute hidden group-hover:block',
+                            reactionPickerPosition.placement === 'bottom'
+                              ? 'top-full mt-2'
+                              : 'bottom-full mb-2',
+                            'right-0'
                           )}
                         >
                           <EmojiPicker

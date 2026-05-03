@@ -22,8 +22,8 @@ export function MessageInput({ className }: MessageInputProps) {
   const [message, setMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
-  const [selectedImage, setSelectedImage] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [selectedImages, setSelectedImages] = useState<File[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const {
@@ -38,8 +38,8 @@ export function MessageInput({ className }: MessageInputProps) {
   useEffect(() => {
     if (!activeConversation) {
       setMessage('')
-      setSelectedImage(null)
-      setImagePreview(null)
+      setSelectedImages([])
+      setImagePreviews([])
       setReplyingTo(null)
     }
   }, [activeConversation, setReplyingTo])
@@ -50,29 +50,49 @@ export function MessageInput({ className }: MessageInputProps) {
   }
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const validFiles: File[] = []
+    for (const file of files) {
       if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file')
-        return
+        toast.error(`${file.name} is not an image file`)
+        continue
       }
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('Image must be less than 5MB')
-        return
+        toast.error(`${file.name} must be less than 5MB`)
+        continue
       }
-      setSelectedImage(file)
-      const reader = new FileReader()
-      reader.onload = (e) => setImagePreview(e.target?.result as string)
-      reader.readAsDataURL(file)
+      validFiles.push(file)
     }
+
+    if (validFiles.length === 0) return
+
+    setSelectedImages((prev) => [...prev, ...validFiles])
+    validFiles.forEach((file) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setImagePreviews((prev) => [...prev, e.target?.result as string])
+      }
+      reader.readAsDataURL(file)
+    })
+
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
   }
 
-  const clearImage = () => {
-    setSelectedImage(null)
-    setImagePreview(null)
+  const removeImage = (index: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index))
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index))
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const clearImages = () => {
+    setSelectedImages([])
+    setImagePreviews([])
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -87,7 +107,7 @@ export function MessageInput({ className }: MessageInputProps) {
 
     const conversationId = activeConversation.id
 
-    if (selectedImage) {
+    if (selectedImages.length > 0) {
       await handleSendImage(conversationId)
     } else {
       await handleSendText(conversationId)
@@ -116,7 +136,7 @@ export function MessageInput({ className }: MessageInputProps) {
   }
 
   const handleSendImage = async (conversationId: string) => {
-    if (!selectedImage) {
+    if (selectedImages.length === 0) {
       return
     }
 
@@ -127,14 +147,14 @@ export function MessageInput({ className }: MessageInputProps) {
     try {
       await sendImageMessage(
         conversationId,
-        selectedImage,
+        selectedImages,
         imageCaption,
         replyingTo?.id
       )
-      clearImage()
+      clearImages()
       setReplyingTo(null)
     } catch {
-      toast.error('Failed to send image. Please try again.')
+      toast.error('Failed to send images. Please try again.')
       setMessage(imageCaption)
     } finally {
       setIsSending(false)
@@ -156,7 +176,7 @@ export function MessageInput({ className }: MessageInputProps) {
 
   const isDisabled = !activeConversation || isSending
   const canSend =
-    (message.trim().length > 0 || selectedImage !== null) && !isDisabled
+    (message.trim().length > 0 || selectedImages.length > 0) && !isDisabled
   const emojiTheme = resolvedTheme === 'dark' ? Theme.DARK : Theme.LIGHT
 
   return (
@@ -188,25 +208,39 @@ export function MessageInput({ className }: MessageInputProps) {
         </div>
       )}
 
-      {imagePreview && (
-        <div className='bg-muted/50 relative flex items-center gap-2 rounded-lg p-2'>
-          <div className='relative'>
-            <img
-              src={imagePreview}
-              alt='Preview'
-              className='h-20 w-20 rounded-lg object-cover'
-            />
+      {imagePreviews.length > 0 && (
+        <div className='bg-muted/50 rounded-lg p-2'>
+          <div className='flex flex-wrap gap-2'>
+            {imagePreviews.map((preview, index) => (
+              <div key={index} className='relative'>
+                <img
+                  src={preview}
+                  alt={`Preview ${index + 1}`}
+                  className='h-20 w-20 rounded-lg object-cover'
+                />
+                <Button
+                  type='button'
+                  variant='secondary'
+                  size='icon'
+                  className='absolute -top-2 -right-2 h-6 w-6 rounded-full'
+                  onClick={() => removeImage(index)}
+                >
+                  <X className='h-3 w-3' />
+                </Button>
+              </div>
+            ))}
+          </div>
+          {imagePreviews.length > 0 && (
             <Button
               type='button'
-              variant='secondary'
-              size='icon'
-              className='absolute -top-2 -right-2 h-6 w-6 rounded-full'
-              onClick={clearImage}
+              variant='ghost'
+              size='sm'
+              className='mt-2 h-6 px-2 text-xs'
+              onClick={clearImages}
             >
-              <X className='h-3 w-3' />
+              Clear all
             </Button>
-          </div>
-          <p className='text-muted-foreground text-xs'>{selectedImage?.name}</p>
+          )}
         </div>
       )}
 
@@ -217,6 +251,7 @@ export function MessageInput({ className }: MessageInputProps) {
             ref={fileInputRef}
             onChange={handleImageSelect}
             accept='image/*'
+            multiple
             className='hidden'
           />
           <Button

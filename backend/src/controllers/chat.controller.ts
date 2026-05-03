@@ -72,10 +72,12 @@ export const getMessages = asyncHandler(
 )
 
 export const sendImageMessage = [
-  upload.single('image'),
+  upload.array('images', 10),
   asyncHandler(async (req: AuthenticatedRequest, res: Response<ApiResponse>) => {
-    if (!req.file) {
-      throw new ValidationError('Image file is required')
+    const files = req.files as Express.Multer.File[] | undefined
+
+    if (!files || files.length === 0) {
+      throw new ValidationError('At least one image file is required')
     }
 
     const { id } = validate(conversationIdSchema, req.params)
@@ -86,8 +88,7 @@ export const sendImageMessage = [
     const message = await chatService.sendImageMessage(
       id,
       req.user!.userId,
-      req.file.buffer,
-      req.file.mimetype,
+      files.map((f) => ({ buffer: f.buffer, mimetype: f.mimetype })),
       content,
       replyToId || undefined
     )

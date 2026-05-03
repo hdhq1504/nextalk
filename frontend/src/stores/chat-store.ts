@@ -27,7 +27,7 @@ interface ChatState {
   ) => Promise<void>
   sendImageMessage: (
     conversationId: string,
-    file: File,
+    files: File[],
     content?: string,
     replyToId?: string
   ) => Promise<void>
@@ -156,11 +156,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendImageMessage: async (conversationId, file, content, replyToId) => {
+  sendImageMessage: async (conversationId, files, content, replyToId) => {
     try {
       const message = await chatService.sendImageMessage(
         conversationId,
-        file,
+        files,
         content,
         replyToId
       )
@@ -326,7 +326,8 @@ export function initializeSocketListeners(): () => void {
     useChatStore.getState().updateMessage(messageId, conversationId, {
       isDeleted: true,
       content: null,
-      imageUrl: null
+      imageUrl: null,
+      imageUrls: null
     })
   }
 

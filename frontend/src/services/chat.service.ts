@@ -91,6 +91,7 @@ export function normalizeMessage(message: ApiMessage): Message {
     type: message.type ?? 'text',
     isDeleted: message.isDeleted ?? false,
     imageUrl: message.imageUrl ?? null,
+    imageUrls: message.imageUrls ?? null,
     replyToId: message.replyToId ?? null,
     replyTo: message.replyTo
       ? normalizeMessage(message.replyTo as ApiMessage)
@@ -210,12 +211,14 @@ export const chatService = {
 
   async sendImageMessage(
     conversationId: string,
-    file: File,
+    files: File[],
     content?: string,
     replyToId?: string
   ): Promise<Message> {
     const formData = new FormData()
-    formData.append('image', file)
+    files.forEach((file) => {
+      formData.append('images', file)
+    })
     if (content?.trim()) {
       formData.append('content', content.trim())
     }

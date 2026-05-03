@@ -11,7 +11,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogHeader,
-  DialogTitle,
+  DialogTitle
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 
@@ -24,7 +24,7 @@ interface NewChatModalProps {
 export function NewChatModal({
   open,
   onOpenChange,
-  onConversationCreated,
+  onConversationCreated
 }: NewChatModalProps) {
   const createDirectConversation = useChatStore(
     (state) => state.createDirectConversation
@@ -127,7 +127,10 @@ export function NewChatModal({
                 >
                   <Avatar>
                     {friend.avatarUrl && (
-                      <AvatarImage src={friend.avatarUrl} alt={friend.username} />
+                      <AvatarImage
+                        src={friend.avatarUrl}
+                        alt={friend.username}
+                      />
                     )}
                     <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>

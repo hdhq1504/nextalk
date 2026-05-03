@@ -168,6 +168,7 @@ model Message {
   isDeleted      Boolean     @default(false) @map("is_deleted")
   replyToId      String?     @map("reply_to_id")
   imageUrl       String?     @map("image_url")
+  imageUrls      String[]    @map("image_urls")
 
   // Relations
   conversation Conversation @relation("ConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade)

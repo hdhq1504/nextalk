@@ -1,30 +1,30 @@
-import { Request } from 'express';
-import { TokenPayload } from '../utils/jwt';
+import { Request } from "express";
+import { TokenPayload } from "../utils/jwt";
 
 // =========================================
 // ENUMS
 // =========================================
 
 export enum FriendRequestStatus {
-  Pending = 'pending',
-  Accepted = 'accepted',
-  Rejected = 'rejected',
+  Pending = "pending",
+  Accepted = "accepted",
+  Rejected = "rejected",
 }
 
 export enum ConversationType {
-  Direct = 'direct',
-  Group = 'group',
+  Direct = "direct",
+  Group = "group",
 }
 
 export enum MemberRole {
-  Admin = 'admin',
-  Member = 'member',
+  Admin = "admin",
+  Member = "member",
 }
 
 export enum MessageType {
-  Text = 'text',
-  Image = 'image',
-  File = 'file',
+  Text = "text",
+  Image = "image",
+  File = "file",
 }
 
 // =========================================
@@ -178,9 +178,9 @@ export interface ConversationListItem {
 // =========================================
 
 export interface ReactionSummary {
-  emoji: string
-  count: number
-  userIds: string[]
+  emoji: string;
+  count: number;
+  userIds: string[];
 }
 
 export interface MessageResponse {
@@ -199,6 +199,7 @@ export interface MessageResponse {
   }[];
   replyToId?: string | null;
   imageUrl?: string | null;
+  imageUrls?: string[] | null;
   replyTo?: MessageResponse | null;
   reactions?: ReactionSummary[];
 }
@@ -226,30 +227,61 @@ export interface MessageReadResponse {
 // =========================================
 
 export interface ServerToClientEvents {
-  'message:new': (message: MessageResponse) => void;
-  'message:update': (message: MessageResponse) => void;
-  'message:delete': (data: { messageId: string; conversationId: string }) => void;
-  'message:read': (data: { messageId: string; userId: string; readAt: Date }) => void;
-  'message:recall': (data: { messageId: string; conversationId: string }) => void;
-  'message:react': (data: { messageId: string; conversationId: string; reactions: ReactionSummary[] }) => void;
-  'user:typing': (data: { userId: string; username: string; isTyping: boolean }) => void;
-  'user:online': (data: { userId: string; isOnline: boolean }) => void;
-  'conversation:update': (conversation: ConversationResponse) => void;
-  'friend:request:new': (request: FriendRequestResponse) => void;
-  'friend:request:update': (request: FriendRequestResponse) => void;
-  'error': (data: { message: string }) => void;
+  "message:new": (message: MessageResponse) => void;
+  "message:update": (message: MessageResponse) => void;
+  "message:delete": (data: {
+    messageId: string;
+    conversationId: string;
+  }) => void;
+  "message:read": (data: {
+    messageId: string;
+    userId: string;
+    readAt: Date;
+  }) => void;
+  "message:recall": (data: {
+    messageId: string;
+    conversationId: string;
+  }) => void;
+  "message:react": (data: {
+    messageId: string;
+    conversationId: string;
+    reactions: ReactionSummary[];
+  }) => void;
+  "user:typing": (data: {
+    userId: string;
+    username: string;
+    isTyping: boolean;
+  }) => void;
+  "user:online": (data: { userId: string; isOnline: boolean }) => void;
+  "conversation:update": (conversation: ConversationResponse) => void;
+  "friend:request:new": (request: FriendRequestResponse) => void;
+  "friend:request:update": (request: FriendRequestResponse) => void;
+  error: (data: { message: string }) => void;
 }
 
 export interface ClientToServerEvents {
-  'message:send': (data: CreateMessageDto, callback?: (response: { success: boolean; message?: MessageResponse; error?: string }) => void) => void;
-  'message:recall': (data: { messageId: string }, callback?: (response: { success: boolean; error?: string }) => void) => void;
-  'message:react': (data: { messageId: string; emoji: string }, callback?: (response: { success: boolean; error?: string }) => void) => void;
-  'message:typing_start': (data: { conversationId: string }) => void;
-  'message:typing_stop': (data: { conversationId: string }) => void;
-  'message:read': (data: { messageId: string; conversationId: string }) => void;
-  'conversation:join': (data: { conversationId: string }) => void;
-  'conversation:leave': (data: { conversationId: string }) => void;
-  'presence:update': (data: { isOnline: boolean }) => void;
+  "message:send": (
+    data: CreateMessageDto,
+    callback?: (response: {
+      success: boolean;
+      message?: MessageResponse;
+      error?: string;
+    }) => void,
+  ) => void;
+  "message:recall": (
+    data: { messageId: string },
+    callback?: (response: { success: boolean; error?: string }) => void,
+  ) => void;
+  "message:react": (
+    data: { messageId: string; emoji: string },
+    callback?: (response: { success: boolean; error?: string }) => void,
+  ) => void;
+  "message:typing_start": (data: { conversationId: string }) => void;
+  "message:typing_stop": (data: { conversationId: string }) => void;
+  "message:read": (data: { messageId: string; conversationId: string }) => void;
+  "conversation:join": (data: { conversationId: string }) => void;
+  "conversation:leave": (data: { conversationId: string }) => void;
+  "presence:update": (data: { isOnline: boolean }) => void;
 }
 
 // =========================================

@@ -36,6 +36,7 @@ export interface Message {
   type?: 'text' | 'image' | 'file'
   isDeleted?: boolean
   imageUrl?: string | null
+  imageUrls?: string[] | null
   replyToId?: string | null
   replyTo?: Message | null
   reactions?: ReactionSummary[]
