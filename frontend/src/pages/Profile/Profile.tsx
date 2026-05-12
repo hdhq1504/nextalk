@@ -5,10 +5,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { Loader2, ArrowLeft, Camera } from 'lucide-react'
-import { format } from 'date-fns'
-import { vi } from 'date-fns/locale'
 
 import { useAuthStore } from '@/stores/auth-store'
+import {
+  buildDateOfBirth,
+  formatDateDisplay,
+  parseDateParts
+} from '@/utils/date'
+import { getInitials } from '@/utils/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -57,35 +61,6 @@ const profileSchema = z.object({
 
 type ProfileFormData = z.infer<typeof profileSchema>
 
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 1)
-}
-
-function formatDateDisplay(dateStr: string | null | undefined): string {
-  if (!dateStr) return 'Not set'
-  const date = new Date(dateStr)
-  return format(date, 'dd/MM/yyyy', { locale: vi })
-}
-
-function parseDateOfBirth(dateStr: string | null | undefined): {
-  day: string
-  month: string
-  year: string
-} {
-  if (!dateStr) return { day: '', month: '', year: '' }
-  const date = new Date(dateStr)
-  return {
-    day: String(date.getDate()),
-    month: String(date.getMonth() + 1),
-    year: String(date.getFullYear())
-  }
-}
-
 export default function ProfilePage() {
   const navigate = useNavigate()
   const { user, isLoading, updateProfile } = useAuthStore()
@@ -108,7 +83,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user) {
-      const { day, month, year } = parseDateOfBirth(user.dateOfBirth || null)
+      const { day, month, year } = parseDateParts(user.dateOfBirth || null)
       reset({
         username: user.username || '',
         phone: user.phone || '',
@@ -120,24 +95,13 @@ export default function ProfilePage() {
     }
   }, [user, reset])
 
-  const buildDateOfBirth = (
-    day: string,
-    month: string,
-    year: string
-  ): string | null => {
-    if (!day || !month || !year) return null
-    const paddedDay = day.padStart(2, '0')
-    const paddedMonth = month.padStart(2, '0')
-    return `${year}-${paddedMonth}-${paddedDay}T00:00:00.000Z`
-  }
-
   const onSubmit = async (data: ProfileFormData) => {
     try {
-      const dateOfBirth = buildDateOfBirth(
-        data.birthDay || '',
-        data.birthMonth || '',
-        data.birthYear || ''
-      )
+      const dateOfBirth = buildDateOfBirth({
+        day: data.birthDay || '',
+        month: data.birthMonth || '',
+        year: data.birthYear || ''
+      })
 
       await updateProfile({
         username: data.username,
@@ -156,7 +120,7 @@ export default function ProfilePage() {
 
   const handleCancel = () => {
     if (user) {
-      const { day, month, year } = parseDateOfBirth(user.dateOfBirth || null)
+      const { day, month, year } = parseDateParts(user.dateOfBirth || null)
       reset({
         username: user.username || '',
         phone: user.phone || '',
@@ -227,7 +191,7 @@ export default function ProfilePage() {
                     alt={user?.username || 'User'}
                   />
                   <AvatarFallback className='text-2xl'>
-                    {user?.username ? getInitials(user.username) : 'U'}
+                    {user?.username ? getInitials(user.username, 1) : 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <button

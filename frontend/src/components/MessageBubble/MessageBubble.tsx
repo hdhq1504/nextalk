@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { isLongMessage } from '@/utils/conversation'
-import { formatMessageTime } from '@/utils/format'
+import { formatMessageTime, getInitials } from '@/utils/format'
 import type { Message, ReactionSummary } from '@/types/chat'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -66,7 +66,9 @@ export function MessageBubble({
   const { resolvedTheme } = useTheme()
   const emojiTheme = resolvedTheme === 'dark' ? Theme.DARK : Theme.LIGHT
 
-  const initials = message.sender?.username?.slice(0, 1).toUpperCase() || '??'
+  const initials = message.sender?.username
+    ? getInitials(message.sender.username, 1)
+    : '??'
   const isLong = isLongMessage(message.content || '')
   const isDeleted = message.isDeleted
   const imageUrls =
@@ -135,11 +137,14 @@ export function MessageBubble({
   useEffect(() => {
     if (!showReactionPicker) return
 
-    updateReactionPickerPosition()
+    const animationFrame = window.requestAnimationFrame(
+      updateReactionPickerPosition
+    )
     window.addEventListener('resize', updateReactionPickerPosition)
     window.addEventListener('scroll', updateReactionPickerPosition, true)
 
     return () => {
+      window.cancelAnimationFrame(animationFrame)
       window.removeEventListener('resize', updateReactionPickerPosition)
       window.removeEventListener('scroll', updateReactionPickerPosition, true)
     }

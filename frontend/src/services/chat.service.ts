@@ -6,7 +6,10 @@ import type {
   MessagesResponse,
   MessageResponse,
   CreateConversationRequest,
-  ReactionSummary
+  CreateDirectConversationRequest,
+  ReactionSummary,
+  SendMessageRequest,
+  UpdateGroupInfoRequest
 } from '@/types/chat'
 import { socketClient } from '@/lib/socket'
 import type { User } from '@/types/auth'
@@ -121,7 +124,7 @@ export function normalizeConversation(
       joinedAt: member.joinedAt ?? conversation.createdAt,
       user: normalizeUser(member.user),
       role: (member as ApiConversationMember).role,
-      isPinned: (member as ApiConversationMember).isPinned,
+      isPinned: (member as ApiConversationMember).isPinned
     })),
     lastMessage,
     updatedAt:
@@ -130,8 +133,11 @@ export function normalizeConversation(
 }
 
 export const chatService = {
-  async getConversations(): Promise<Conversation[]> {
-    const response = await apiClient.get<ConversationResponse>('/conversations')
+  async getConversations(signal?: AbortSignal): Promise<Conversation[]> {
+    const response = await apiClient.get<ConversationResponse>(
+      '/conversations',
+      { signal }
+    )
 
     if (!response.data.success) {
       throw new Error(response.data.error || 'Failed to fetch conversations')
@@ -142,16 +148,61 @@ export const chatService = {
     )
   },
 
-  async getMessages(conversationId: string): Promise<Message[]> {
+  async getMessages(
+    conversationId: string,
+    cursor?: string,
+    limit = 50,
+    signal?: AbortSignal
+  ): Promise<{ messages: Message[]; nextCursor?: string }> {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (cursor) params.append('cursor', cursor)
+
     const response = await apiClient.get<MessagesResponse>(
-      `/conversations/${conversationId}/messages`
+      `/conversations/${conversationId}/messages?${params.toString()}`,
+      { signal }
     )
 
     if (!response.data.success) {
       throw new Error(response.data.error || 'Failed to fetch messages')
     }
 
-    return ((response.data.data || []) as ApiMessage[]).map(normalizeMessage)
+    const data = response.data.data as
+      | { messages: ApiMessage[]; nextCursor?: string }
+      | ApiMessage[]
+    if (Array.isArray(data)) {
+      return { messages: (data as ApiMessage[]).map(normalizeMessage) }
+    }
+    return {
+      messages: (data.messages as ApiMessage[]).map(normalizeMessage),
+      nextCursor: data.nextCursor
+    }
+  },
+
+  async searchMessages(
+    conversationId: string,
+    query: string,
+    limit = 50
+  ): Promise<{ messages: Message[]; nextCursor?: string }> {
+    const params = new URLSearchParams({ q: query, limit: String(limit) })
+
+    const response = await apiClient.get<MessagesResponse>(
+      `/conversations/${conversationId}/messages/search?${params.toString()}`
+    )
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to search messages')
+    }
+
+    const data = response.data.data as
+      | { messages: ApiMessage[]; nextCursor?: string }
+      | ApiMessage[]
+    if (Array.isArray(data)) {
+      return { messages: (data as ApiMessage[]).map(normalizeMessage) }
+    }
+    return {
+      messages: (data.messages as ApiMessage[]).map(normalizeMessage),
+      nextCursor: data.nextCursor
+    }
   },
 
   async createConversation(
@@ -173,7 +224,9 @@ export const chatService = {
     return response.data.data as unknown as Conversation
   },
 
-  async createDirectConversation(friendId: string): Promise<Conversation> {
+  async createDirectConversation(
+    friendId: CreateDirectConversationRequest['friendId']
+  ): Promise<Conversation> {
     const response = await apiClient.post<MessageResponse>(
       '/conversations/direct',
       { friendId }
@@ -193,8 +246,8 @@ export const chatService = {
   },
 
   async createGroupConversation(
-    name: string,
-    memberIds: string[]
+    name: NonNullable<CreateConversationRequest['name']>,
+    memberIds: CreateConversationRequest['memberIds']
   ): Promise<Conversation> {
     const response = await apiClient.post<MessageResponse>(
       '/conversations/group',
@@ -240,7 +293,9 @@ export const chatService = {
     conversationId: string,
     userId: string
   ): Promise<void> {
-    const response = await apiClient.delete(`/conversations/${conversationId}/members/${userId}`)
+    const response = await apiClient.delete(
+      `/conversations/${conversationId}/members/${userId}`
+    )
 
     if (!response.data.success) {
       throw new Error(response.data.error || 'Failed to remove member')
@@ -249,7 +304,7 @@ export const chatService = {
 
   async updateGroupInfo(
     conversationId: string,
-    data: { name?: string; avatarUrl?: string }
+    data: UpdateGroupInfoRequest
   ): Promise<Conversation> {
     const response = await apiClient.patch<MessageResponse>(
       `/conversations/${conversationId}`,
@@ -270,7 +325,9 @@ export const chatService = {
   },
 
   async leaveGroup(conversationId: string): Promise<void> {
-    const response = await apiClient.post(`/conversations/${conversationId}/leave`)
+    const response = await apiClient.post(
+      `/conversations/${conversationId}/leave`
+    )
 
     if (!response.data.success) {
       throw new Error(response.data.error || 'Failed to leave group')
@@ -278,8 +335,8 @@ export const chatService = {
   },
 
   async sendMessage(
-    conversationId: string,
-    content: string,
+    conversationId: SendMessageRequest['conversationId'],
+    content: SendMessageRequest['content'],
     replyToId?: string
   ): Promise<Message> {
     const response = await socketClient.emitWithAck<SocketSendResponse>(

@@ -2,12 +2,13 @@ import { Response } from 'express'
 import { z } from 'zod'
 import { chatService } from '../services/chat.service'
 import { asyncHandler, ValidationError } from '../middlewares/errorHandler'
+import { validate } from '../utils/validate'
 import { ApiResponse, AuthenticatedRequest } from '../types'
 import { upload } from '../utils/fileUpload'
 import {
+  emitToConversationMembers,
   getConversationRoom,
   getSocketServer,
-  getUserRoom,
 } from '../socket'
 
 const directConversationSchema = z.object({
@@ -21,17 +22,6 @@ const conversationIdSchema = z.object({
 const messageIdSchema = z.object({
   messageId: z.string().uuid('Invalid message ID'),
 })
-
-function validate<T>(schema: z.ZodSchema<T>, data: unknown): T {
-  const result = schema.safeParse(data)
-  if (!result.success) {
-    const messages = result.error.issues
-      .map((e) => `${e.path.join('.')}: ${e.message}`)
-      .join(', ')
-    throw new ValidationError(messages)
-  }
-  return result.data
-}
 
 export const getConversations = asyncHandler(
   async (req: AuthenticatedRequest, res: Response<ApiResponse>) => {
@@ -62,11 +52,42 @@ export const createDirectConversation = asyncHandler(
 export const getMessages = asyncHandler(
   async (req: AuthenticatedRequest, res: Response<ApiResponse>) => {
     const { id } = validate(conversationIdSchema, req.params)
-    const messages = await chatService.getMessages(id, req.user!.userId)
+    const cursor = req.query.cursor as string | undefined
+    const limit = parseInt(req.query.limit as string) || 50
+    const result = await chatService.getMessages(id, req.user!.userId, cursor, limit)
 
     res.status(200).json({
       success: true,
-      data: messages,
+      data: result,
+    })
+  }
+)
+
+export const searchMessages = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response<ApiResponse>) => {
+    const { id } = validate(conversationIdSchema, req.params)
+    const query = req.query.q as string | undefined
+    const cursor = req.query.cursor as string | undefined
+    const limit = parseInt(req.query.limit as string) || 50
+
+    if (!query || !query.trim()) {
+      res.status(200).json({
+        success: true,
+        data: { messages: [], nextCursor: undefined },
+      })
+      return
+    }
+
+    const result = await chatService.searchMessages(
+      id,
+      req.user!.userId,
+      query,
+      limit
+    )
+
+    res.status(200).json({
+      success: true,
+      data: result,
     })
   }
 )
@@ -99,12 +120,8 @@ export const sendImageMessage = [
     const io = getSocketServer()
 
     if (io) {
-      const room = getConversationRoom(id)
-      const memberRooms =
-        conversation.members?.map((member) => getUserRoom(member.userId)) ?? []
-
-      io.to([room, ...memberRooms]).emit('message:new', message)
-      io.to([room, ...memberRooms]).emit('conversation:update', conversation)
+      emitToConversationMembers(io, conversation, 'message:new', message)
+      emitToConversationMembers(io, conversation, 'conversation:update', conversation)
     }
 
     res.status(201).json({
@@ -184,9 +201,7 @@ export const addGroupMember = asyncHandler(
 
     const io = getSocketServer()
     if (io) {
-      const room = getConversationRoom(id)
-      const memberRooms = conversation.members?.map((m) => getUserRoom(m.userId)) ?? []
-      io.to([room, ...memberRooms]).emit('conversation:member_added', {
+      emitToConversationMembers(io, conversation, 'conversation:member_added', {
         conversationId: id,
         userId,
         conversation,

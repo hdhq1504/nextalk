@@ -2,34 +2,11 @@ import bcrypt from 'bcryptjs';
 import prisma from '../config/database';
 import { generateTokens, verifyRefreshToken, TokenPayload, Tokens } from '../utils/jwt';
 import { ConflictError, AuthenticationError, NotFoundError } from '../middlewares/errorHandler';
+import type { AuthResponse, UpdateUserDto, UserDetailResponse, UserResponse } from '../types';
+
+export type { AuthResponse } from '../types';
 
 const SALT_ROUNDS = 12;
-
-export interface UserResponse {
-  id: string;
-  email: string;
-  username: string;
-  avatarUrl: string | null;
-  createdAt: Date;
-}
-
-export interface UserDetailResponse {
-  id: string;
-  email: string;
-  username: string;
-  avatarUrl: string | null;
-  phone: string | null;
-  dateOfBirth: Date | null;
-  bio: string | null;
-  isOnline: boolean;
-  lastSeen: Date | null;
-  createdAt: Date;
-}
-
-export interface AuthResponse {
-  user: UserResponse;
-  tokens: Tokens;
-}
 
 export class AuthService {
   async register(email: string, password: string, username: string): Promise<AuthResponse> {
@@ -51,13 +28,19 @@ export class AuthService {
       },
     });
 
+    const newUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { tokenVersion: { increment: 1 } },
+    });
+
     const tokens = generateTokens({
-      userId: user.id,
-      email: user.email,
+      userId: newUser.id,
+      email: newUser.email,
+      tokenVersion: newUser.tokenVersion,
     });
 
     return {
-      user: this.formatUser(user),
+      user: this.formatUser(newUser),
       tokens,
     };
   }
@@ -77,36 +60,53 @@ export class AuthService {
       throw new AuthenticationError('Invalid email or password');
     }
 
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { tokenVersion: { increment: 1 } },
+    });
+
     const tokens = generateTokens({
-      userId: user.id,
-      email: user.email,
+      userId: updatedUser.id,
+      email: updatedUser.email,
+      tokenVersion: updatedUser.tokenVersion,
     });
 
     return {
-      user: this.formatUser(user),
+      user: this.formatUser(updatedUser),
       tokens,
     };
   }
 
-  async refreshToken(refreshToken: string): Promise<Tokens> {
+  async refreshToken(refreshTokenValue: string): Promise<Tokens> {
+    let payload: TokenPayload;
     try {
-      const payload = verifyRefreshToken(refreshToken);
-
-      const user = await prisma.user.findUnique({
-        where: { id: payload.userId },
-      });
-
-      if (!user) {
-        throw new AuthenticationError('User not found');
-      }
-
-      return generateTokens({
-        userId: user.id,
-        email: user.email,
-      });
+      payload = verifyRefreshToken(refreshTokenValue);
     } catch {
       throw new AuthenticationError('Invalid refresh token');
     }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+    });
+
+    if (!user) {
+      throw new AuthenticationError('User not found');
+    }
+
+    if (user.tokenVersion > payload.tokenVersion) {
+      throw new AuthenticationError('Token has been revoked. Please login again.');
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { tokenVersion: { increment: 1 } },
+    });
+
+    return generateTokens({
+      userId: updatedUser.id,
+      email: updatedUser.email,
+      tokenVersion: updatedUser.tokenVersion,
+    });
   }
 
   async getUserById(userId: string): Promise<UserResponse> {
@@ -133,7 +133,7 @@ export class AuthService {
     return this.formatUserDetail(user);
   }
 
-  async updateUser(userId: string, data: { username?: string; phone?: string | null; dateOfBirth?: string | null; bio?: string | null }): Promise<UserDetailResponse> {
+  async updateUser(userId: string, data: UpdateUserDto): Promise<UserDetailResponse> {
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -148,7 +148,10 @@ export class AuthService {
   }
 
   async logout(userId: string): Promise<void> {
-    console.log(`User ${userId} logged out`);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
   }
 
   async checkEmail(email: string): Promise<boolean> {
@@ -158,7 +161,7 @@ export class AuthService {
     return existingUser !== null;
   }
 
-  private formatUser(user: { id: string; email: string; username: string; avatarUrl: string | null; createdAt: Date }): UserResponse {
+  private formatUser(user: Pick<UserResponse, 'id' | 'email' | 'username' | 'avatarUrl' | 'createdAt'>): UserResponse {
     return {
       id: user.id,
       email: user.email,
@@ -168,18 +171,7 @@ export class AuthService {
     };
   }
 
-  private formatUserDetail(user: {
-    id: string;
-    email: string;
-    username: string;
-    avatarUrl: string | null;
-    phone: string | null;
-    dateOfBirth: Date | null;
-    bio: string | null;
-    isOnline: boolean;
-    lastSeen: Date | null;
-    createdAt: Date;
-  }): UserDetailResponse {
+  private formatUserDetail(user: UserDetailResponse): UserDetailResponse {
     return {
       id: user.id,
       email: user.email,

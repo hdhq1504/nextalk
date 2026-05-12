@@ -28,9 +28,6 @@ export interface ApiResponse<T> {
   error?: string
 }
 
-export interface UpdateProfileDto {
-  username?: string
-  phone?: string | null
-  dateOfBirth?: string | null
-  bio?: string | null
-}
+export type UpdateProfileDto = Partial<
+  Pick<User, 'username' | 'phone' | 'dateOfBirth' | 'bio'>
+>

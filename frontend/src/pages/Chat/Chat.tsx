@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useChatStore } from '@/stores/chat-store'
 import { useAuthStore } from '@/stores/auth-store'
-import { initializeSocketListeners } from '@/stores/chat-store'
+import { initializeSocketListeners } from '@/stores/chat-socket-listeners'
 import { socketClient } from '@/lib/socket'
 import { Sidebar } from '@/components/Sidebar'
 import { ConversationHeader } from '@/components/ConversationHeader'
@@ -36,7 +36,11 @@ export function Chat() {
 
   useEffect(() => {
     if (window.innerWidth < 1024) {
-      setIsSidebarOpen(!activeConversation)
+      const timeoutId = window.setTimeout(
+        () => setIsSidebarOpen(!activeConversation),
+        0
+      )
+      return () => window.clearTimeout(timeoutId)
     }
   }, [activeConversation])
 

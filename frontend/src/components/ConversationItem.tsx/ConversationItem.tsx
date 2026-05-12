@@ -1,7 +1,10 @@
 import { useRef, useEffect } from 'react'
 import { Pin, PinOff, VolumeX, Volume2, Trash2, UserX } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getOtherMember } from '@/utils/conversation'
+import {
+  getConversationDisplayInfo,
+  getLastMessagePreview
+} from '@/utils/conversation'
 import { formatTime } from '@/utils/format'
 import type { Conversation } from '@/types/chat'
 import { MessageSquare } from 'lucide-react'
@@ -46,20 +49,11 @@ export function ConversationItem({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0
 
-  const otherMember = getOtherMember(conversation.members, currentUserId)
-  const displayName =
-    conversation.name ||
-    otherMember?.user.username ||
-    otherMember?.user.email ||
-    'Unknown'
-
-  const avatarUrl = otherMember?.user.avatarUrl
-  const initials = displayName.slice(0, 1).toUpperCase()
-  const lastMessagePreview = conversation.lastMessage
-    ? conversation.lastMessage.type === 'image'
-      ? conversation.lastMessage.content || 'Ảnh'
-      : conversation.lastMessage.content
-    : null
+  const { displayName, avatarUrl, initials } = getConversationDisplayInfo(
+    conversation,
+    currentUserId
+  )
+  const lastMessagePreview = getLastMessagePreview(conversation)
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (isMobile) {

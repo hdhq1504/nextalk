@@ -6,6 +6,11 @@ export interface ReactionSummary {
   userIds: string[]
 }
 
+export interface OptimisticMessage extends Message {
+  _tempId: string
+  _status: 'pending' | 'sent' | 'failed'
+}
+
 export interface Conversation {
   id: string
   name: string | null
@@ -53,7 +58,7 @@ export interface ConversationResponse {
 
 export interface MessagesResponse {
   success: boolean
-  data?: Message[]
+  data?: Message[] | { messages: Message[]; nextCursor?: string }
   message?: string
   error?: string
 }
@@ -65,16 +70,18 @@ export interface MessageResponse {
   error?: string
 }
 
-export interface CreateConversationRequest {
-  memberIds: string[]
-  name?: string
+export type CreateConversationRequest = Partial<Pick<Conversation, 'name'>> & {
+  memberIds: ConversationMember['userId'][]
 }
 
-export interface CreateDirectConversationRequest {
-  friendId: string
+export type CreateDirectConversationRequest = {
+  friendId: ConversationMember['userId']
 }
 
-export interface SendMessageRequest {
-  conversationId: string
-  content: string
+export type UpdateGroupInfoRequest = Partial<
+  Pick<Conversation, 'name'> & Pick<User, 'avatarUrl'>
+>
+
+export type SendMessageRequest = Pick<Message, 'conversationId'> & {
+  content: NonNullable<Message['content']>
 }

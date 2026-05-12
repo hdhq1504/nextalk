@@ -20,7 +20,9 @@ export const friendService = {
     return response.data.data
   },
 
-  async sendFriendRequest(receiverId: string): Promise<FriendRequest> {
+  async sendFriendRequest(
+    receiverId: UserSearchResult['id']
+  ): Promise<FriendRequest> {
     const response = await apiClient.post<ApiResponse<FriendRequest>>(
       '/friends/request',
       { receiverId }

@@ -15,8 +15,11 @@ const app: Application = express()
 app.use(helmet())
 
 // CORS Configuration
+const corsOrigin = process.env.CORS_ORIGIN;
+if (!corsOrigin) throw new Error('CORS_ORIGIN environment variable is required');
+
 const corsOptions: cors.CorsOptions = {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: corsOrigin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],

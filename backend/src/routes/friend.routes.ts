@@ -9,6 +9,7 @@ import {
   getPendingRequestsCount,
 } from '../controllers/friend.controller';
 import { authenticate } from '../middlewares/auth.middleware';
+import { searchRateLimiter } from '../middlewares/rateLimit';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ const router = Router();
  * @desc    Search users by username or email
  * @access  Private
  */
-router.post('/search', authenticate, searchUsers);
+router.post('/search', authenticate, searchRateLimiter, searchUsers);
 
 /**
  * @route   POST /api/friends/request

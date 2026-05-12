@@ -6,6 +6,7 @@ import {
   useEffect
 } from 'react'
 import { cn } from '@/lib/utils'
+import { useImageAttachments } from '@/hooks/useImageAttachments'
 import { useChatStore } from '@/stores/chat-store'
 import { useTheme } from 'next-themes'
 import { Send, Paperclip, Smile, X } from 'lucide-react'
@@ -22,10 +23,15 @@ export function MessageInput({ className }: MessageInputProps) {
   const [message, setMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
-  const [selectedImages, setSelectedImages] = useState<File[]>([])
-  const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const {
+    fileInputRef,
+    selectedImages,
+    imagePreviews,
+    handleImageSelect,
+    removeImage,
+    clearImages
+  } = useImageAttachments()
   const {
     activeConversation,
     sendMessage,
@@ -38,64 +44,14 @@ export function MessageInput({ className }: MessageInputProps) {
   useEffect(() => {
     if (!activeConversation) {
       setMessage('')
-      setSelectedImages([])
-      setImagePreviews([])
+      clearImages()
       setReplyingTo(null)
     }
-  }, [activeConversation, setReplyingTo])
+  }, [activeConversation, clearImages, setReplyingTo])
 
   const handleEmojiClick = (emojiData: EmojiClickData) => {
     setMessage((prev) => prev + emojiData.emoji)
     inputRef.current?.focus()
-  }
-
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    if (files.length === 0) return
-
-    const validFiles: File[] = []
-    for (const file of files) {
-      if (!file.type.startsWith('image/')) {
-        toast.error(`${file.name} is not an image file`)
-        continue
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error(`${file.name} must be less than 5MB`)
-        continue
-      }
-      validFiles.push(file)
-    }
-
-    if (validFiles.length === 0) return
-
-    setSelectedImages((prev) => [...prev, ...validFiles])
-    validFiles.forEach((file) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setImagePreviews((prev) => [...prev, e.target?.result as string])
-      }
-      reader.readAsDataURL(file)
-    })
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
-
-  const removeImage = (index: number) => {
-    setSelectedImages((prev) => prev.filter((_, i) => i !== index))
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index))
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
-
-  const clearImages = () => {
-    setSelectedImages([])
-    setImagePreviews([])
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -253,6 +209,7 @@ export function MessageInput({ className }: MessageInputProps) {
             accept='image/*'
             multiple
             className='hidden'
+            aria-label='Select images to upload'
           />
           <Button
             type='button'
@@ -262,7 +219,7 @@ export function MessageInput({ className }: MessageInputProps) {
             disabled={isDisabled}
             aria-label='Attach image'
           >
-            <Paperclip className='size-5' />
+            <Paperclip className='size-5' aria-hidden='true' />
           </Button>
           <div className='relative'>
             <Button
@@ -271,9 +228,11 @@ export function MessageInput({ className }: MessageInputProps) {
               size='icon'
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
               disabled={isDisabled}
+              aria-expanded={showEmojiPicker}
+              aria-haspopup='dialog'
               aria-label='Add emoji'
             >
-              <Smile className='size-5' />
+              <Smile className='size-5' aria-hidden='true' />
             </Button>
 
             {showEmojiPicker && (
@@ -310,6 +269,7 @@ export function MessageInput({ className }: MessageInputProps) {
             disabled={isDisabled}
             rows={1}
             className='max-h-[120px] min-h-[40px] resize-none px-3 py-2.5 text-sm'
+            aria-label='Message input'
           />
         </div>
 
@@ -319,7 +279,10 @@ export function MessageInput({ className }: MessageInputProps) {
           size='icon'
           aria-label='Send message'
         >
-          <Send className={cn('size-5', isSending && 'animate-pulse')} />
+          <Send
+            className={cn('size-5', isSending && 'animate-pulse')}
+            aria-hidden='true'
+          />
         </Button>
       </div>
     </form>

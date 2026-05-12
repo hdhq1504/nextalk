@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { X, Mail, Calendar, UserPlus, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getOtherMember } from '@/utils/conversation'
+import { formatLongDate } from '@/utils/date'
+import { getInitials } from '@/utils/format'
 import { friendService } from '@/services/friend.service'
 import type { Conversation } from '@/types/chat'
 import type { User } from '@/types/auth'
@@ -16,16 +18,6 @@ interface UserInfoModalProps {
   open: boolean
   onClose: () => void
   onAddFriend?: (userId: string) => void
-}
-
-function formatDate(dateString: string): string {
-  if (!dateString) return '-'
-
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
 }
 
 export function UserInfoModal({
@@ -47,8 +39,8 @@ export function UserInfoModal({
 
   useEffect(() => {
     if (!open || !otherMember?.userId || conversation?.isGroup) {
-      setFriendDetails(null)
-      return
+      const timeoutId = window.setTimeout(() => setFriendDetails(null), 0)
+      return () => window.clearTimeout(timeoutId)
     }
 
     let isMounted = true
@@ -81,7 +73,7 @@ export function UserInfoModal({
     conversation.name || contactUser.username || contactUser.email || 'Unknown'
 
   const avatarUrl = contactUser.avatarUrl
-  const initials = displayName.slice(0, 1).toUpperCase()
+  const initials = getInitials(displayName, 1)
   const isGroup = conversation.isGroup
   const canShowFriendActions = false
 
@@ -101,7 +93,7 @@ export function UserInfoModal({
     <div className='flex flex-col items-center gap-3'>
       <Avatar size='lg'>
         <AvatarFallback className='bg-primary text-primary-foreground'>
-          {conversation.name?.slice(0, 1).toUpperCase() || 'GP'}
+          {conversation.name ? getInitials(conversation.name, 1) : 'GP'}
         </AvatarFallback>
       </Avatar>
       <div className='text-center'>
@@ -164,7 +156,7 @@ export function UserInfoModal({
                   <Calendar className='text-muted-foreground size-4' />
                   <span className='text-muted-foreground'>Joined</span>
                   <span className='ml-auto'>
-                    {formatDate(contactUser.createdAt || '')}
+                    {formatLongDate(contactUser.createdAt)}
                   </span>
                 </div>
               </>
@@ -189,8 +181,9 @@ export function UserInfoModal({
                           />
                         )}
                         <AvatarFallback>
-                          {member.user.username?.slice(0, 2).toUpperCase() ||
-                            'U'}
+                          {member.user.username
+                            ? getInitials(member.user.username)
+                            : 'U'}
                         </AvatarFallback>
                       </Avatar>
                       <div className='min-w-0 flex-1'>

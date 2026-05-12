@@ -1,7 +1,11 @@
 import { Server } from "http";
 import { Server as SocketIOServer, Socket } from "socket.io";
 import { chatService } from "../services/chat.service";
-import { ClientToServerEvents, ServerToClientEvents } from "../types";
+import {
+  ClientToServerEvents,
+  ConversationResponse,
+  ServerToClientEvents,
+} from "../types";
 import { verifyAccessToken } from "../utils/jwt";
 
 type ChatSocket = Socket<ClientToServerEvents, ServerToClientEvents> & {
@@ -14,11 +18,14 @@ let ioInstance: SocketIOServer<
 > | null = null;
 
 export function initSocket(httpServer: Server) {
+  const corsOrigin = process.env.CORS_ORIGIN;
+  if (!corsOrigin) throw new Error('CORS_ORIGIN environment variable is required');
+
   const io = new SocketIOServer<ClientToServerEvents, ServerToClientEvents>(
     httpServer,
     {
       cors: {
-        origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+        origin: corsOrigin,
         credentials: true,
       },
     },
@@ -84,13 +91,14 @@ export function initSocket(httpServer: Server) {
           socket.userId!,
         );
         const room = getConversationRoom(data.conversationId);
-        const memberRooms =
-          conversation.members?.map((member) => getUserRoom(member.userId)) ??
-          [];
-
         socket.join(room);
-        io.to([room, ...memberRooms]).emit("message:new", message);
-        io.to([room, ...memberRooms]).emit("conversation:update", conversation);
+        emitToConversationMembers(io, conversation, "message:new", message);
+        emitToConversationMembers(
+          io,
+          conversation,
+          "conversation:update",
+          conversation,
+        );
         callback?.({ success: true, message });
       } catch (error) {
         callback?.({ success: false, error: getErrorMessage(error) });
@@ -147,6 +155,27 @@ export function getConversationRoom(conversationId: string): string {
 
 export function getUserRoom(userId: string): string {
   return `user:${userId}`;
+}
+
+export function getConversationTargetRooms(
+  conversation: ConversationResponse,
+): string[] {
+  const room = getConversationRoom(conversation.id);
+  const memberRooms =
+    conversation.members?.map((member) => getUserRoom(member.userId)) ?? [];
+
+  return [room, ...memberRooms];
+}
+
+export function emitToConversationMembers<
+  Event extends keyof ServerToClientEvents,
+>(
+  io: SocketIOServer<ClientToServerEvents, ServerToClientEvents>,
+  conversation: ConversationResponse,
+  event: Event,
+  ...args: Parameters<ServerToClientEvents[Event]>
+): void {
+  io.to(getConversationTargetRooms(conversation)).emit(event, ...args);
 }
 
 function extractCookieToken(cookieHeader?: string): string | undefined {

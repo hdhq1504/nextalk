@@ -1,8 +1,18 @@
 import jwt from 'jsonwebtoken';
+import { config } from 'dotenv';
+
+config();
+
+const JWT_SECRET = process.env.JWT_SECRET as string;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET as string;
+
+if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required');
+if (!JWT_REFRESH_SECRET) throw new Error('JWT_REFRESH_SECRET environment variable is required');
 
 export interface TokenPayload {
   userId: string;
   email: string;
+  tokenVersion: number;
 }
 
 export interface Tokens {
@@ -10,8 +20,6 @@ export interface Tokens {
   refreshToken: string;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'fallback-refresh-secret-key';
 const JWT_EXPIRES_IN = '15m';
 const JWT_REFRESH_EXPIRES_IN = '7d';
 

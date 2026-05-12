@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useChatStore } from '@/stores/chat-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { MessageBubble } from '../MessageBubble'
 import { ImageLightbox } from '../ImageLightbox'
-import { Loader2, MessageSquare } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface MessageListProps {
   className?: string
@@ -23,9 +24,10 @@ export function MessageList({ className }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
 
-  const conversationMessages = activeConversation
-    ? messages[activeConversation.id] || []
-    : []
+  const conversationMessages = useMemo(
+    () => (activeConversation ? messages[activeConversation.id] || [] : []),
+    [activeConversation, messages]
+  )
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -58,9 +60,14 @@ export function MessageList({ className }: MessageListProps) {
           'flex flex-1 flex-col items-center justify-center gap-4',
           className
         )}
+        role='region'
+        aria-label='Message area'
       >
         <div className='bg-secondary rounded-full p-5'>
-          <MessageSquare className='text-muted-foreground size-7' />
+          <MessageSquare
+            className='text-muted-foreground size-7'
+            aria-hidden='true'
+          />
         </div>
         <div className='text-center'>
           <p className='text-base font-medium'>Select a conversation</p>
@@ -74,8 +81,31 @@ export function MessageList({ className }: MessageListProps) {
 
   if (isMessagesLoading) {
     return (
-      <div className={cn('flex flex-1 items-center justify-center', className)}>
-        <Loader2 className='text-muted-foreground size-6 animate-spin' />
+      <div
+        className={cn('flex flex-1 flex-col gap-4 p-4', className)}
+        role='status'
+        aria-label='Loading messages'
+      >
+        {Array.from({ length: 6 }).map((_, i) => {
+          const isOwn = i % 2 === 0
+          return (
+            <div
+              key={i}
+              className={cn(
+                'flex items-end gap-2',
+                isOwn && 'flex-row-reverse'
+              )}
+            >
+              <Skeleton className='h-8 w-8 rounded-full' />
+              <Skeleton
+                className={cn(
+                  'h-12 rounded-2xl',
+                  isOwn ? 'w-32 rounded-tr-sm' : 'w-40 rounded-tl-sm'
+                )}
+              />
+            </div>
+          )
+        })}
       </div>
     )
   }
@@ -87,9 +117,14 @@ export function MessageList({ className }: MessageListProps) {
           'flex flex-1 flex-col items-center justify-center gap-4',
           className
         )}
+        role='region'
+        aria-label='No messages'
       >
         <div className='bg-secondary rounded-full p-5'>
-          <MessageSquare className='text-muted-foreground size-7' />
+          <MessageSquare
+            className='text-muted-foreground size-7'
+            aria-hidden='true'
+          />
         </div>
         <div className='text-center'>
           <p className='text-base font-medium'>No messages yet</p>
@@ -108,8 +143,11 @@ export function MessageList({ className }: MessageListProps) {
           'flex flex-1 flex-col overflow-y-auto px-4 py-4',
           className
         )}
+        role='log'
+        aria-label='Messages'
+        aria-live='polite'
       >
-        <div className='flex flex-col gap-3'>
+        <div className='flex flex-col gap-3' role='list'>
           {conversationMessages.map((message, index) => {
             const prevMessage =
               index > 0 ? conversationMessages[index - 1] : null
@@ -121,21 +159,22 @@ export function MessageList({ className }: MessageListProps) {
                 60000
 
             return (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                isOwn={message.senderId === user?.id}
-                showAvatar={showAvatar}
-                senderName={showAvatar ? message.sender?.username : undefined}
-                onReply={handleReply}
-                onRecall={handleRecall}
-                onReact={handleReact}
-                currentUserId={user?.id || ''}
-                onImageClick={setLightboxImage}
-              />
+              <div key={message.id} role='listitem'>
+                <MessageBubble
+                  message={message}
+                  isOwn={message.senderId === user?.id}
+                  showAvatar={showAvatar}
+                  senderName={showAvatar ? message.sender?.username : undefined}
+                  onReply={handleReply}
+                  onRecall={handleRecall}
+                  onReact={handleReact}
+                  currentUserId={user?.id || ''}
+                  onImageClick={setLightboxImage}
+                />
+              </div>
             )
           })}
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} aria-hidden='true' />
         </div>
       </div>
 

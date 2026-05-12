@@ -53,6 +53,7 @@ model User {
   lastSeen     DateTime? @map("last_seen")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
+  tokenVersion Int       @default(0) @map("token_version")
 
   // Relations
   sentFriendRequests       FriendRequest[] @relation("SentFriendRequests")
@@ -66,7 +67,6 @@ model User {
   messageReactions        MessageReaction[] @relation("UserMessageReactions")
 
   @@map("users")
-  @@index([email])
   @@index([username])
 }
 
@@ -89,6 +89,8 @@ model FriendRequest {
   @@unique([senderId, receiverId])
   @@map("friend_requests")
   @@index([receiverId])
+  @@index([receiverId, status])
+  @@index([senderId, status])
 }
 
 // =========================================
@@ -108,6 +110,7 @@ model Friendship {
   @@unique([userId, friendId])
   @@map("friendships")
   @@index([userId])
+  @@index([userId, createdAt])
 }
 
 // =========================================
@@ -151,6 +154,8 @@ model ConversationMember {
   @@map("conversation_members")
   @@index([userId])
   @@index([conversationId])
+  @@index([userId, isHidden])
+  @@index([conversationId, joinedAt])
 }
 
 // =========================================
@@ -181,6 +186,7 @@ model Message {
   @@map("messages")
   @@index([conversationId])
   @@index([createdAt])
+  @@index([conversationId, createdAt])
 }
 
 // =========================================

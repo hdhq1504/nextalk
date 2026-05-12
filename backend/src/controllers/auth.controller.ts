@@ -2,6 +2,7 @@ import { Response } from 'express'
 import { z } from 'zod'
 import { authService, AuthResponse } from '../services/auth.service'
 import { asyncHandler, ValidationError } from '../middlewares/errorHandler'
+import { formatZodError, validateBody } from '../utils/validate'
 import { AuthenticatedRequest, ApiResponse } from '../types/index'
 import {
   ACCESS_TOKEN_COOKIE,
@@ -32,17 +33,6 @@ const loginSchema = z.object({
 const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token is required'),
 })
-
-function validateBody<T>(schema: z.ZodSchema<T>) {
-  return (data: unknown): T => {
-    const result = schema.safeParse(data)
-    if (!result.success) {
-      const messages = result.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')
-      throw new ValidationError(messages)
-    }
-    return result.data
-  }
-}
 
 const validateRegister = validateBody(registerSchema)
 const validateLogin = validateBody(loginSchema)
@@ -147,8 +137,7 @@ export const updateProfile = asyncHandler(async (req: AuthenticatedRequest, res:
   const parsed = updateProfileSchema.safeParse(req.body)
 
   if (!parsed.success) {
-    const messages = parsed.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')
-    throw new ValidationError(messages)
+    throw new ValidationError(formatZodError(parsed.error))
   }
 
   const { username, phone, dateOfBirth, bio } = parsed.data

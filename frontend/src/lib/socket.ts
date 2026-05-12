@@ -8,6 +8,8 @@ const ACCESS_TOKEN_KEY = 'accessToken'
 class SocketClient {
   private static instance: SocketClient
   private socket: Socket | null = null
+  private listeners: Map<string, Set<(...args: unknown[]) => void>> = new Map()
+  private reconnectHandler: (() => void) | null = null
 
   private constructor() {}
 
@@ -45,6 +47,9 @@ class SocketClient {
 
     this.socket.on('connect', () => {
       console.log('Socket connected:', this.socket?.id)
+      if (this.reconnectHandler) {
+        this.reconnectHandler()
+      }
     })
 
     this.socket.on('disconnect', (reason) => {
@@ -106,14 +111,33 @@ class SocketClient {
 
   public on(event: string, callback: (...args: unknown[]) => void): void {
     this.socket?.on(event, callback)
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set())
+    }
+    this.listeners.get(event)!.add(callback)
   }
 
   public off(event: string, callback?: (...args: unknown[]) => void): void {
     if (callback) {
       this.socket?.off(event, callback)
+      this.listeners.get(event)?.delete(callback)
     } else {
       this.socket?.off(event)
+      this.listeners.delete(event)
     }
+  }
+
+  public removeAllListeners(): void {
+    this.listeners.forEach((callbacks, event) => {
+      callbacks.forEach((callback) => {
+        this.socket?.off(event, callback)
+      })
+    })
+    this.listeners.clear()
+  }
+
+  public setReconnectHandler(handler: () => void): void {
+    this.reconnectHandler = handler
   }
 }
 

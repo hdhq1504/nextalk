@@ -32,11 +32,12 @@ export function formatMessageTime(dateString: string): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export function getInitials(name: string): string {
+export function getInitials(name: string, maxLength = 2): string {
   return name
     .split(' ')
+    .filter(Boolean)
     .map((n) => n[0])
     .join('')
     .toUpperCase()
-    .slice(0, 2)
+    .slice(0, maxLength)
 }

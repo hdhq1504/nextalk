@@ -1,5 +1,5 @@
 import { Request } from "express";
-import { TokenPayload } from "../utils/jwt";
+import { TokenPayload, Tokens } from "../utils/jwt";
 
 // =========================================
 // ENUMS
@@ -95,14 +95,21 @@ export interface UserDetailResponse extends UserResponse {
   lastSeen: Date | null;
 }
 
-export interface UserPublicResponse {
-  id: string;
-  email?: string;
-  username: string;
-  avatarUrl: string | null;
-  isOnline: boolean;
-  lastSeen: Date | null;
-  createdAt?: Date;
+export type UserPublicResponse = Pick<
+  UserDetailResponse,
+  "id" | "username" | "avatarUrl" | "isOnline" | "lastSeen"
+> &
+  Partial<Pick<UserDetailResponse, "email" | "createdAt">>;
+
+export type UpdateUserDto = Partial<
+  Pick<UserDetailResponse, "username" | "phone" | "bio"> & {
+    dateOfBirth: string | null;
+  }
+>;
+
+export interface AuthResponse {
+  user: UserResponse;
+  tokens: Tokens;
 }
 
 // =========================================
@@ -158,6 +165,12 @@ export interface ConversationResponse {
   lastMessage?: MessageResponse | null;
 }
 
+export type UpdateGroupInfoDto = Partial<
+  Omit<Pick<ConversationResponse, "name" | "avatarUrl">, "name"> & {
+    name: NonNullable<ConversationResponse["name"]>;
+  }
+>;
+
 export interface ConversationListItem {
   id: string;
   type: ConversationType;
@@ -165,11 +178,9 @@ export interface ConversationListItem {
   avatarUrl: string | null;
   createdAt: Date;
   lastMessage: MessageResponse | null;
-  members: {
+  members: (Pick<ConversationMemberResponse, "role" | "isPinned"> & {
     user: UserPublicResponse;
-    role: MemberRole;
-    isPinned: boolean;
-  }[];
+  })[];
   unreadCount?: number;
 }
 
@@ -204,12 +215,11 @@ export interface MessageResponse {
   reactions?: ReactionSummary[];
 }
 
-export interface CreateMessageDto {
-  conversationId: string;
-  content: string;
+export type CreateMessageDto = Pick<MessageResponse, "conversationId"> & {
+  content: NonNullable<MessageResponse["content"]>;
   type?: MessageType;
   replyToId?: string;
-}
+};
 
 // =========================================
 // MESSAGE READ

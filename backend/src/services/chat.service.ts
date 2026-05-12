@@ -14,6 +14,7 @@ import {
   MessageResponse,
   MessageType,
   ReactionSummary,
+  UpdateGroupInfoDto,
 } from "../types";
 
 const userSelect = {
@@ -144,20 +145,68 @@ class ChatService {
   async getMessages(
     conversationId: string,
     userId: string,
-  ): Promise<MessageResponse[]> {
+    cursor?: string,
+    limit: number = 50,
+  ): Promise<{ messages: MessageResponse[]; nextCursor?: string }> {
     await this.assertConversationMember(conversationId, userId);
+
+    const safeLimit = Math.min(Math.max(1, limit), 100);
 
     const messages = await prisma.message.findMany({
       where: {
         conversationId,
+        ...(cursor ? { id: { lt: cursor } } : {}),
       },
       include: messageInclude,
-      orderBy: {
-        createdAt: "asc",
-      },
+      orderBy: { createdAt: "desc" },
+      take: safeLimit + 1,
     });
 
-    return messages.map((message) => this.formatMessage(message));
+    const hasMore = messages.length > safeLimit;
+    const results = hasMore ? messages.slice(0, -1) : messages;
+
+    return {
+      messages: results.map((message) => this.formatMessage(message)).reverse(),
+      nextCursor: hasMore ? results[results.length - 1].id : undefined,
+    };
+  }
+
+  async searchMessages(
+    conversationId: string,
+    userId: string,
+    query: string,
+    limit: number = 50,
+  ): Promise<{ messages: MessageResponse[]; nextCursor?: string }> {
+    await this.assertConversationMember(conversationId, userId);
+
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      return { messages: [] };
+    }
+
+    const safeLimit = Math.min(Math.max(1, limit), 100);
+
+    const messages = await prisma.message.findMany({
+      where: {
+        conversationId,
+        isDeleted: false,
+        content: {
+          contains: trimmedQuery,
+          mode: "insensitive",
+        },
+      },
+      include: messageInclude,
+      orderBy: { createdAt: "desc" },
+      take: safeLimit + 1,
+    });
+
+    const hasMore = messages.length > safeLimit;
+    const results = hasMore ? messages.slice(0, -1) : messages;
+
+    return {
+      messages: results.map((message) => this.formatMessage(message)),
+      nextCursor: hasMore ? results[results.length - 1].id : undefined,
+    };
   }
 
   async sendMessage(
@@ -440,18 +489,14 @@ class ChatService {
       throw new ConflictError("Creator cannot be added as a member");
     }
 
-    for (const memberId of uniqueMemberIds) {
-      const friendship = await prisma.friendship.findUnique({
-        where: {
-          userId_friendId: {
-            userId: creatorId,
-            friendId: memberId,
-          },
-        },
-      });
-      if (!friendship) {
-        throw new AuthorizationError("You can only add friends to the group");
-      }
+    const friendships = await prisma.friendship.findMany({
+      where: {
+        userId: creatorId,
+        friendId: { in: uniqueMemberIds },
+      },
+    });
+    if (friendships.length !== uniqueMemberIds.length) {
+      throw new AuthorizationError("You can only add friends to the group");
     }
 
     const conversation = await prisma.conversation.create({
@@ -462,7 +507,10 @@ class ChatService {
         members: {
           create: [
             { userId: creatorId, role: MemberRole.Admin },
-            ...uniqueMemberIds.map((id) => ({ userId: id, role: MemberRole.Member })),
+            ...uniqueMemberIds.map((id) => ({
+              userId: id,
+              role: MemberRole.Member,
+            })),
           ],
         },
       },
@@ -577,7 +625,7 @@ class ChatService {
   async updateGroupInfo(
     conversationId: string,
     requesterId: string,
-    data: { name?: string; avatarUrl?: string },
+    data: UpdateGroupInfoDto,
   ): Promise<ConversationResponse> {
     await this.assertGroupAdmin(conversationId, requesterId);
 
@@ -594,7 +642,7 @@ class ChatService {
       throw new ValidationError("This is not a group conversation");
     }
 
-    const updateData: { name?: string; avatarUrl?: string | null } = {};
+    const updateData: UpdateGroupInfoDto = {};
     if (data.name !== undefined) {
       const trimmedName = data.name.trim();
       if (!trimmedName) {
@@ -615,10 +663,7 @@ class ChatService {
     return this.formatConversation(updated);
   }
 
-  async leaveGroup(
-    conversationId: string,
-    userId: string,
-  ): Promise<void> {
+  async leaveGroup(conversationId: string, userId: string): Promise<void> {
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
       select: { type: true },

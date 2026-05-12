@@ -1,29 +1,26 @@
 import prisma from '../config/database';
 import { NotFoundError, ConflictError, AuthorizationError } from '../middlewares/errorHandler';
+import { DEFAULT_PAGE_SIZE } from '../config/constants';
+import type { FriendRequestStatus, UserResponse } from '../types';
 
-export interface UserSearchResult {
-  id: string;
-  username: string;
-  email: string;
-  avatarUrl: string | null;
-  createdAt: Date;
-}
+export type UserSearchResult = Pick<
+  UserResponse,
+  'id' | 'username' | 'email' | 'avatarUrl' | 'createdAt'
+>;
 
 export interface FriendRequestResponse {
   id: string;
   senderId: string;
   receiverId: string;
-  status: string;
+  status: FriendRequestStatus | string;
   sender: UserSearchResult;
   createdAt: Date;
 }
 
-export interface FriendResponse {
-  id: string;
-  friendId: string;
+export type FriendResponse = Pick<FriendRequestResponse, 'id' | 'createdAt'> & {
+  friendId: UserSearchResult['id'];
   friend: UserSearchResult;
-  createdAt: Date;
-}
+};
 
 export class FriendService {
   async searchUsers(currentUserId: string, query: string): Promise<UserSearchResult[]> {
@@ -46,7 +43,7 @@ export class FriendService {
         avatarUrl: true,
         createdAt: true,
       },
-      take: 20,
+      take: DEFAULT_PAGE_SIZE,
     });
 
     return users;
@@ -266,20 +263,11 @@ export class FriendService {
     return count;
   }
 
-  private formatFriendRequest(request: {
-    id: string;
-    senderId: string;
-    receiverId: string;
-    status: string;
-    createdAt: Date;
-    sender: {
-      id: string;
-      username: string;
-      email: string;
-      avatarUrl: string | null;
-      createdAt: Date;
-    };
-  }): FriendRequestResponse {
+  private formatFriendRequest(
+    request: Omit<FriendRequestResponse, 'sender'> & {
+      sender: UserSearchResult;
+    },
+  ): FriendRequestResponse {
     return {
       id: request.id,
       senderId: request.senderId,

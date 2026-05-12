@@ -1,89 +1,53 @@
 import { create } from 'zustand'
-import {
-  chatService,
-  normalizeConversation,
-  normalizeMessage
-} from '@/services/chat.service'
+import { chatService } from '@/services/chat.service'
 import { socketClient } from '@/lib/socket'
-import type { Conversation, Message, ReactionSummary } from '@/types/chat'
-
-interface ChatState {
-  conversations: Conversation[]
-  activeConversation: Conversation | null
-  messages: Record<string, Message[]>
-  isLoading: boolean
-  isMessagesLoading: boolean
-  error: string | null
-  replyingTo: Message | null
-
-  fetchConversations: () => Promise<Conversation[]>
-  setActiveConversation: (conversation: Conversation | null) => void
-  fetchMessages: (conversationId: string) => Promise<void>
-  createDirectConversation: (friendId: string) => Promise<Conversation>
-  createGroupConversation: (name: string, memberIds: string[]) => Promise<Conversation>
-  addGroupMember: (conversationId: string, userId: string) => Promise<Conversation>
-  removeGroupMember: (conversationId: string, userId: string) => Promise<void>
-  updateGroupInfo: (
-    conversationId: string,
-    data: { name?: string; avatarUrl?: string | null }
-  ) => Promise<Conversation>
-  leaveGroup: (conversationId: string) => Promise<void>
-  sendMessage: (
-    conversationId: string,
-    content: string,
-    replyToId?: string
-  ) => Promise<void>
-  sendImageMessage: (
-    conversationId: string,
-    files: File[],
-    content?: string,
-    replyToId?: string
-  ) => Promise<void>
-  addMessage: (message: Message) => void
-  upsertConversation: (conversation: Conversation) => void
-  updateConversationLastMessage: (
-    conversationId: string,
-    message: Message
-  ) => void
-  clearError: () => void
-  setReplyingTo: (message: Message | null) => void
-  recallMessage: (messageId: string) => Promise<void>
-  reactToMessage: (messageId: string, emoji: string) => Promise<void>
-  updateMessage: (
-    messageId: string,
-    conversationId: string,
-    patch: Partial<Message>
-  ) => void
-  updateMessageReactions: (
-    messageId: string,
-    conversationId: string,
-    reactions: ReactionSummary[]
-  ) => void
-  removeMemberFromConversation: (conversationId: string, userId: string) => void
-}
+import { useAuthStore } from '@/stores/auth-store'
+import {
+  createOptimisticMessage,
+  removeOptimisticMessage,
+  sortConversationsByUpdate,
+  upsertServerMessage
+} from '@/stores/chat-store.helpers'
+import type { ChatState } from '@/stores/chat-store.types'
+import type { Message, OptimisticMessage } from '@/types/chat'
 
 export const useChatStore = create<ChatState>((set, get) => ({
   conversations: [],
   activeConversation: null,
   messages: {},
+  messageCursors: {},
+  hasMoreMessages: {},
   isLoading: false,
   isMessagesLoading: false,
   error: null,
   replyingTo: null,
+  searchQuery: '',
+  searchResults: [],
+  isSearching: false,
 
   fetchConversations: async () => {
-    set({ isLoading: true, error: null })
+    get().conversationsController?.abort()
+    const controller = new AbortController()
+    set({ conversationsController: controller, isLoading: true, error: null })
     try {
-      const conversations = await chatService.getConversations()
-      set({ conversations, isLoading: false })
+      const conversations = await chatService.getConversations(
+        controller.signal
+      )
+      set({
+        conversations,
+        isLoading: false,
+        conversationsController: undefined
+      })
       return conversations
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return []
       set({
         error:
           error instanceof Error
             ? error.message
             : 'Failed to fetch conversations',
-        isLoading: false
+        isLoading: false,
+        conversationsController: undefined
       })
       return []
     }
@@ -110,20 +74,101 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   fetchMessages: async (conversationId) => {
+    get().messagesController?.abort()
+    const controller = new AbortController()
+    set({
+      messagesController: controller,
+      isMessagesLoading: true,
+      error: null
+    })
+    try {
+      const result = await chatService.getMessages(
+        conversationId,
+        undefined,
+        50,
+        controller.signal
+      )
+      set((state) => ({
+        messages: { ...state.messages, [conversationId]: result.messages },
+        messageCursors: {
+          ...state.messageCursors,
+          [conversationId]: result.nextCursor
+        },
+        hasMoreMessages: {
+          ...state.hasMoreMessages,
+          [conversationId]: !!result.nextCursor
+        },
+        isMessagesLoading: false,
+        messagesController: undefined
+      }))
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
+      set({
+        error:
+          error instanceof Error ? error.message : 'Failed to fetch messages',
+        isMessagesLoading: false,
+        messagesController: undefined
+      })
+    }
+  },
+
+  loadMoreMessages: async (conversationId) => {
+    const cursor = get().messageCursors[conversationId]
+    if (!cursor || !get().hasMoreMessages[conversationId]) return
+
     set({ isMessagesLoading: true, error: null })
     try {
-      const messages = await chatService.getMessages(conversationId)
+      const result = await chatService.getMessages(conversationId, cursor)
       set((state) => ({
-        messages: { ...state.messages, [conversationId]: messages },
+        messages: {
+          ...state.messages,
+          [conversationId]: [
+            ...state.messages[conversationId],
+            ...result.messages
+          ]
+        },
+        messageCursors: {
+          ...state.messageCursors,
+          [conversationId]: result.nextCursor
+        },
+        hasMoreMessages: {
+          ...state.hasMoreMessages,
+          [conversationId]: !!result.nextCursor
+        },
         isMessagesLoading: false
       }))
     } catch (error) {
       set({
         error:
-          error instanceof Error ? error.message : 'Failed to fetch messages',
+          error instanceof Error
+            ? error.message
+            : 'Failed to load more messages',
         isMessagesLoading: false
       })
     }
+  },
+
+  searchMessages: async (conversationId, query) => {
+    if (!query.trim()) {
+      set({ searchResults: [], searchQuery: '', isSearching: false })
+      return
+    }
+    set({ searchQuery: query, isSearching: true, error: null })
+    try {
+      const result = await chatService.searchMessages(conversationId, query)
+      set({ searchResults: result.messages, isSearching: false })
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error ? error.message : 'Failed to search messages',
+        isSearching: false,
+        searchResults: []
+      })
+    }
+  },
+
+  clearSearch: () => {
+    set({ searchQuery: '', searchResults: [], isSearching: false })
   },
 
   createDirectConversation: async (friendId) => {
@@ -150,7 +195,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   createGroupConversation: async (name, memberIds) => {
     set({ isLoading: true, error: null })
     try {
-      const conversation = await chatService.createGroupConversation(name, memberIds)
+      const conversation = await chatService.createGroupConversation(
+        name,
+        memberIds
+      )
       get().upsertConversation(conversation)
       get().setActiveConversation(conversation)
       await get().fetchMessages(conversation.id)
@@ -159,9 +207,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error
-            ? error.message
-            : 'Failed to create group',
+          error instanceof Error ? error.message : 'Failed to create group',
         isLoading: false
       })
       throw error
@@ -171,15 +217,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   addGroupMember: async (conversationId, userId) => {
     set({ error: null })
     try {
-      const conversation = await chatService.addGroupMember(conversationId, userId)
+      const conversation = await chatService.addGroupMember(
+        conversationId,
+        userId
+      )
       get().upsertConversation(conversation)
       return conversation
     } catch (error) {
       set({
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Failed to add member',
+        error: error instanceof Error ? error.message : 'Failed to add member'
       })
       throw error
     }
@@ -193,9 +239,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (error) {
       set({
         error:
-          error instanceof Error
-            ? error.message
-            : 'Failed to remove member',
+          error instanceof Error ? error.message : 'Failed to remove member'
       })
       throw error
     }
@@ -204,15 +248,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   updateGroupInfo: async (conversationId, data) => {
     set({ error: null })
     try {
-      const conversation = await chatService.updateGroupInfo(conversationId, data)
+      const conversation = await chatService.updateGroupInfo(
+        conversationId,
+        data
+      )
       get().upsertConversation(conversation)
       return conversation
     } catch (error) {
       set({
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Failed to update group',
+        error: error instanceof Error ? error.message : 'Failed to update group'
       })
       throw error
     }
@@ -225,26 +269,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
       get().removeMemberFromConversation(conversationId, '')
     } catch (error) {
       set({
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Failed to leave group',
+        error: error instanceof Error ? error.message : 'Failed to leave group'
       })
       throw error
     }
   },
 
   sendMessage: async (conversationId, content, replyToId) => {
+    const currentUser = useAuthStore.getState().user
+    if (!currentUser) return
+
+    const optimisticMessage = createOptimisticMessage({
+      conversationId,
+      content,
+      type: 'text',
+      currentUser,
+      replyToId
+    })
+
+    get().addOptimisticMessage(optimisticMessage)
+    set({ replyingTo: null })
+
     try {
       const message = await chatService.sendMessage(
         conversationId,
         content,
         replyToId
       )
-      get().addMessage(message)
+      get().replaceOptimisticMessage(optimisticMessage._tempId, message)
       get().updateConversationLastMessage(conversationId, message)
-      set({ replyingTo: null })
     } catch (error) {
+      get().updateMessageStatus(optimisticMessage._tempId, 'failed')
       set({
         error: error instanceof Error ? error.message : 'Failed to send message'
       })
@@ -253,6 +308,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   sendImageMessage: async (conversationId, files, content, replyToId) => {
+    const currentUser = useAuthStore.getState().user
+    if (!currentUser) return
+
+    const optimisticMessage = createOptimisticMessage({
+      conversationId,
+      content: content || null,
+      type: 'image',
+      imageUrls: files.map(() => URL.createObjectURL(files[0])),
+      currentUser,
+      replyToId
+    })
+
+    get().addOptimisticMessage(optimisticMessage)
+    set({ replyingTo: null })
+
     try {
       const message = await chatService.sendImageMessage(
         conversationId,
@@ -260,10 +330,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         content,
         replyToId
       )
-      get().addMessage(message)
+      get().replaceOptimisticMessage(optimisticMessage._tempId, message)
       get().updateConversationLastMessage(conversationId, message)
-      set({ replyingTo: null })
     } catch (error) {
+      get().updateMessageStatus(optimisticMessage._tempId, 'failed')
       set({
         error: error instanceof Error ? error.message : 'Failed to send image'
       })
@@ -271,21 +341,70 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  addMessage: (message) => {
+  addOptimisticMessage: (message) => {
+    set((state) => ({
+      messages: {
+        ...state.messages,
+        [message.conversationId]: [
+          ...(state.messages[message.conversationId] || []),
+          message
+        ]
+      }
+    }))
+  },
+
+  replaceOptimisticMessage: (tempId, message) => {
     set((state) => {
       const conversationMessages = state.messages[message.conversationId] || []
-      const messageExists = conversationMessages.some(
-        (m) => m.id === message.id
+      const messagesWithoutTemp = removeOptimisticMessage(
+        conversationMessages,
+        tempId
       )
-
-      if (messageExists) {
-        return state
-      }
+      const updatedMessages = upsertServerMessage(messagesWithoutTemp, message)
 
       return {
         messages: {
           ...state.messages,
-          [message.conversationId]: [...conversationMessages, message]
+          [message.conversationId]: updatedMessages
+        }
+      }
+    })
+  },
+
+  updateMessageStatus: (tempId, status) => {
+    set((state) => {
+      const updatedMessages: Record<string, (Message | OptimisticMessage)[]> =
+        {}
+      for (const [convId, msgs] of Object.entries(state.messages)) {
+        updatedMessages[convId] = msgs.map((m) => {
+          if ('_tempId' in m && m._tempId === tempId) {
+            return { ...m, _status: status }
+          }
+          return m
+        })
+      }
+      return { messages: updatedMessages }
+    })
+  },
+
+  addMessage: (message) => {
+    set((state) => {
+      const conversationMessages = state.messages[message.conversationId] || []
+
+      // Prevent duplicate messages - check if message already exists
+      const messageExists = conversationMessages.some(
+        (m) => m.id === message.id
+      )
+      if (messageExists) {
+        return state
+      }
+
+      const updatedMessages = upsertServerMessage(conversationMessages, message)
+
+      return {
+        messages: {
+          ...state.messages,
+          [message.conversationId]: updatedMessages
         }
       }
     })
@@ -300,13 +419,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           )
         : [conversation, ...state.conversations]
 
-      conversations.sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      )
-
       return {
-        conversations,
+        conversations: sortConversationsByUpdate(conversations),
         activeConversation:
           state.activeConversation?.id === conversation.id
             ? { ...state.activeConversation, ...conversation }
@@ -323,12 +437,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           : conv
       )
 
-      updatedConversations.sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      )
-
-      return { conversations: updatedConversations }
+      return { conversations: sortConversationsByUpdate(updatedConversations) }
     })
   },
 
@@ -430,102 +539,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
             : state.activeConversation
       }
     })
-  }
-}))
+  },
 
-export function initializeSocketListeners(): () => void {
-  const handleNewMessage = (rawMessage: unknown) => {
-    const message = normalizeMessage(
-      rawMessage as Parameters<typeof normalizeMessage>[0]
-    )
-    useChatStore.getState().addMessage(message)
-    useChatStore
-      .getState()
-      .updateConversationLastMessage(message.conversationId, message)
-  }
-
-  const handleConversationUpdate = (rawConversation: unknown) => {
-    useChatStore
-      .getState()
-      .upsertConversation(
-        normalizeConversation(
-          rawConversation as Parameters<typeof normalizeConversation>[0]
-        )
-      )
-  }
-
-  const handleMessageRecall = (data: unknown) => {
-    const { messageId, conversationId } = data as {
-      messageId: string
-      conversationId: string
-    }
-    useChatStore.getState().updateMessage(messageId, conversationId, {
-      isDeleted: true,
-      content: null,
-      imageUrl: null,
-      imageUrls: null
+  resetStore: () => {
+    get().conversationsController?.abort()
+    get().messagesController?.abort()
+    set({
+      conversations: [],
+      activeConversation: null,
+      messages: {},
+      messageCursors: {},
+      hasMoreMessages: {},
+      conversationsController: undefined,
+      messagesController: undefined,
+      isLoading: false,
+      isMessagesLoading: false,
+      error: null,
+      replyingTo: null,
+      searchQuery: '',
+      searchResults: [],
+      isSearching: false
     })
   }
-
-  const handleMessageReact = (data: unknown) => {
-    const { messageId, conversationId, reactions } = data as {
-      messageId: string
-      conversationId: string
-      reactions: ReactionSummary[]
-    }
-    useChatStore
-      .getState()
-      .updateMessageReactions(messageId, conversationId, reactions)
-  }
-
-  const handleMemberAdded = (data: unknown) => {
-    const { conversation } = data as {
-      conversationId: string
-      userId: string
-      conversation: unknown
-    }
-    useChatStore
-      .getState()
-      .upsertConversation(
-        normalizeConversation(
-          conversation as Parameters<typeof normalizeConversation>[0]
-        )
-      )
-  }
-
-  const handleMemberRemoved = (data: unknown) => {
-    const { conversationId, userId } = data as {
-      conversationId: string
-      userId: string
-    }
-    useChatStore.getState().removeMemberFromConversation(conversationId, userId)
-  }
-
-  const handleConversationGroupUpdated = (data: unknown) => {
-    useChatStore
-      .getState()
-      .upsertConversation(
-        normalizeConversation(
-          data as Parameters<typeof normalizeConversation>[0]
-        )
-      )
-  }
-
-  socketClient.on('message:new', handleNewMessage)
-  socketClient.on('conversation:update', handleConversationUpdate)
-  socketClient.on('message:recall', handleMessageRecall)
-  socketClient.on('message:react', handleMessageReact)
-  socketClient.on('conversation:member_added', handleMemberAdded)
-  socketClient.on('conversation:member_removed', handleMemberRemoved)
-  socketClient.on('conversation:updated', handleConversationGroupUpdated)
-
-  return () => {
-    socketClient.off('message:new', handleNewMessage)
-    socketClient.off('conversation:update', handleConversationUpdate)
-    socketClient.off('message:recall', handleMessageRecall)
-    socketClient.off('message:react', handleMessageReact)
-    socketClient.off('conversation:member_added', handleMemberAdded)
-    socketClient.off('conversation:member_removed', handleMemberRemoved)
-    socketClient.off('conversation:updated', handleConversationGroupUpdated)
-  }
-}
+}))

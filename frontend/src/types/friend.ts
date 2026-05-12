@@ -1,10 +1,9 @@
-export interface UserSearchResult {
-  id: string
-  username: string
-  email: string
-  avatarUrl: string | null
-  createdAt: string
-}
+import type { User } from '@/types/auth'
+
+export type UserSearchResult = Pick<
+  User,
+  'id' | 'username' | 'email' | 'avatarUrl' | 'createdAt'
+>
 
 export interface FriendRequest {
   id: string
@@ -15,11 +14,9 @@ export interface FriendRequest {
   createdAt: string
 }
 
-export interface Friend {
-  id: string
-  friendId: string
+export type Friend = Pick<FriendRequest, 'id' | 'createdAt'> & {
+  friendId: UserSearchResult['id']
   friend: UserSearchResult
-  createdAt: string
 }
 
 export interface ApiResponse<T = unknown> {

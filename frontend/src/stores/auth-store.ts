@@ -1,18 +1,27 @@
 import { create } from 'zustand'
 import { authService } from '@/services/auth.service'
 import { isTokenExpired } from '@/lib/token'
-import type { User, UpdateProfileDto } from '@/types/auth'
+import { socketClient } from '@/lib/socket'
+import { useChatStore } from '@/stores/chat-store'
+import type { User } from '@/types/auth'
+
+type AuthServiceMethod<T extends keyof typeof authService> =
+  (typeof authService)[T]
 
 interface AuthState {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, username: string) => Promise<void>
+  login: (...args: Parameters<AuthServiceMethod<'login'>>) => Promise<void>
+  register: (
+    ...args: Parameters<AuthServiceMethod<'register'>>
+  ) => Promise<void>
   logout: () => void
   checkAuth: () => Promise<void>
   setUser: (user: User | null) => void
-  updateProfile: (data: UpdateProfileDto) => Promise<void>
+  updateProfile: (
+    ...args: Parameters<AuthServiceMethod<'updateProfile'>>
+  ) => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>()((set) => ({
@@ -25,6 +34,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
     try {
       await authService.login(email, password)
       const user = await authService.getProfile()
+      useChatStore.getState().resetStore()
       set({ user, isAuthenticated: true, isLoading: false })
     } catch (error) {
       set({ isLoading: false })
@@ -37,6 +47,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
     try {
       await authService.register(email, password, username)
       const user = await authService.getProfile()
+      useChatStore.getState().resetStore()
       set({ user, isAuthenticated: true, isLoading: false })
     } catch (error) {
       set({ isLoading: false })
@@ -46,6 +57,9 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   logout: () => {
     authService.clearTokens()
+    socketClient.disconnect()
+    socketClient.removeAllListeners()
+    useChatStore.getState().resetStore()
     set({ user: null, isAuthenticated: false })
   },
 
@@ -88,7 +102,9 @@ export const useAuthStore = create<AuthState>()((set) => ({
     set({ user })
   },
 
-  updateProfile: async (data: UpdateProfileDto) => {
+  updateProfile: async (
+    ...[data]: Parameters<AuthServiceMethod<'updateProfile'>>
+  ) => {
     set({ isLoading: true })
     try {
       const user = await authService.updateProfile(data)

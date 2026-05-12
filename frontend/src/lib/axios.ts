@@ -1,5 +1,7 @@
 import axios from 'axios'
 import { authService } from '@/services/auth.service'
+import { useAuthStore } from '@/stores/auth-store'
+import { socketClient } from '@/lib/socket'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -65,6 +67,8 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest)
         } catch {
           authService.clearTokens()
+          useAuthStore.getState().logout()
+          socketClient.disconnect()
           window.location.href = '/login'
         } finally {
           isRefreshing = false

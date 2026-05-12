@@ -3,6 +3,7 @@ import {
   createDirectConversation,
   getConversations,
   getMessages,
+  searchMessages,
   sendImageMessage,
   recallMessage,
   reactMessage,
@@ -20,6 +21,7 @@ router.get('/', authenticate, getConversations)
 router.post('/direct', authenticate, createDirectConversation)
 router.post('/group', authenticate, createGroupConversation)
 router.get('/:id/messages', authenticate, getMessages)
+router.get('/:id/messages/search', authenticate, searchMessages)
 router.post('/:id/messages/image', authenticate, sendImageMessage)
 router.patch('/messages/:messageId/recall', authenticate, recallMessage)
 router.post('/messages/:messageId/reactions', authenticate, reactMessage)

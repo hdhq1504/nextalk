@@ -1,7 +1,8 @@
 import { Response } from 'express'
 import { z } from 'zod'
 import { friendService } from '../services/friend.service'
-import { asyncHandler, ValidationError } from '../middlewares/errorHandler'
+import { asyncHandler } from '../middlewares/errorHandler'
+import { validateBody } from '../utils/validate'
 import { AuthenticatedRequest, ApiResponse } from '../types/index'
 
 const searchUsersSchema = z.object({
@@ -15,17 +16,6 @@ const sendRequestSchema = z.object({
 const requestIdSchema = z.object({
   id: z.string().uuid('Invalid request ID'),
 })
-
-function validateBody<T>(schema: z.ZodSchema<T>) {
-  return (data: unknown): T => {
-    const result = schema.safeParse(data)
-    if (!result.success) {
-      const messages = result.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')
-      throw new ValidationError(messages)
-    }
-    return result.data
-  }
-}
 
 const validateSearch = validateBody(searchUsersSchema)
 const validateSendRequest = validateBody(sendRequestSchema)

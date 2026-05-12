@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { ApiResponse } from '../types/index';
+import { logger } from '../utils/logger';
+import { formatZodError } from '../utils/validate';
 
 export class AppError extends Error {
   constructor(
@@ -49,7 +51,15 @@ export const errorHandler = (
   res: Response<ApiResponse>,
   _next: NextFunction
 ): void => {
-  console.error('Error:', err);
+  if (err instanceof AppError || err instanceof ZodError) {
+    // Operational errors - don't need full stack trace
+    if (process.env.NODE_ENV !== 'production') {
+      logger.warn(err.message);
+    }
+  } else {
+    // Unexpected errors - log full stack
+    logger.error('Unhandled error', err);
+  }
 
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
@@ -60,10 +70,9 @@ export const errorHandler = (
   }
 
   if (err instanceof ZodError) {
-    const messages = err.issues.map((e) => `${e.path.join('.')}: ${e.message}`);
     res.status(400).json({
       success: false,
-      error: messages.join(', '),
+      error: formatZodError(err),
     });
     return;
   }
