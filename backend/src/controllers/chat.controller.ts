@@ -141,3 +141,124 @@ export const reactMessage = asyncHandler(
     })
   }
 )
+
+const createGroupSchema = z.object({
+  name: z.string().min(1, 'Group name is required').max(100, 'Group name too long'),
+  memberIds: z.array(z.string().uuid()).min(2, 'At least 2 members required'),
+})
+
+const addMemberSchema = z.object({
+  userId: z.string().uuid('Invalid user ID'),
+})
+
+const updateGroupSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  avatarUrl: z.string().url().optional(),
+})
+
+export const createGroupConversation = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response<ApiResponse>) => {
+    const { name, memberIds } = validate(createGroupSchema, req.body)
+    const conversation = await chatService.createGroupConversation(
+      req.user!.userId,
+      name,
+      memberIds
+    )
+
+    res.status(201).json({
+      success: true,
+      data: conversation,
+    })
+  }
+)
+
+export const addGroupMember = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response<ApiResponse>) => {
+    const { id } = validate(conversationIdSchema, req.params)
+    const { userId } = validate(addMemberSchema, req.body)
+    const conversation = await chatService.addGroupMember(
+      id,
+      req.user!.userId,
+      userId
+    )
+
+    const io = getSocketServer()
+    if (io) {
+      const room = getConversationRoom(id)
+      const memberRooms = conversation.members?.map((m) => getUserRoom(m.userId)) ?? []
+      io.to([room, ...memberRooms]).emit('conversation:member_added', {
+        conversationId: id,
+        userId,
+        conversation,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      data: conversation,
+    })
+  }
+)
+
+export const removeGroupMember = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response<ApiResponse>) => {
+    const { id, userId } = validate(
+      conversationIdSchema.merge(
+        z.object({ userId: z.string().uuid('Invalid user ID') })
+      ),
+      { ...req.params, userId: req.params.userId }
+    )
+    await chatService.removeGroupMember(id, req.user!.userId, userId)
+
+    const io = getSocketServer()
+    if (io) {
+      io.to(getConversationRoom(id)).emit('conversation:member_removed', {
+        conversationId: id,
+        userId,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Member removed successfully',
+    })
+  }
+)
+
+export const updateGroupInfo = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response<ApiResponse>) => {
+    const { id } = validate(conversationIdSchema, req.params)
+    const data = validate(updateGroupSchema, req.body)
+    const conversation = await chatService.updateGroupInfo(id, req.user!.userId, data)
+
+    const io = getSocketServer()
+    if (io) {
+      io.to(getConversationRoom(id)).emit('conversation:updated', conversation)
+    }
+
+    res.status(200).json({
+      success: true,
+      data: conversation,
+    })
+  }
+)
+
+export const leaveGroup = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response<ApiResponse>) => {
+    const { id } = validate(conversationIdSchema, req.params)
+    await chatService.leaveGroup(id, req.user!.userId)
+
+    const io = getSocketServer()
+    if (io) {
+      io.to(getConversationRoom(id)).emit('conversation:member_removed', {
+        conversationId: id,
+        userId: req.user!.userId,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Left the group successfully',
+    })
+  }
+)

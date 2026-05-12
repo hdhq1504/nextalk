@@ -14,19 +14,19 @@ export const ACCESS_TOKEN_MAX_AGE = 15 * 60 // 15 minutes in seconds
 export const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 // 7 days in seconds
 
 export const ACCESS_TOKEN_COOKIE_OPTIONS: CookieOptions = {
-  httpOnly: true,
+  httpOnly: false,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict',
+  sameSite: 'lax',
   maxAge: ACCESS_TOKEN_MAX_AGE,
   path: '/',
 }
 
 export const REFRESH_TOKEN_COOKIE_OPTIONS: CookieOptions = {
-  httpOnly: true,
+  httpOnly: false,
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax',
   maxAge: REFRESH_TOKEN_MAX_AGE,
-  path: '/api/auth/refresh',
+  path: '/',
 }
 
 export function buildCookieHeader(name: string, value: string, options: CookieOptions): string {

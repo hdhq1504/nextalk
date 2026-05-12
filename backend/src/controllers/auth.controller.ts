@@ -58,7 +58,7 @@ function setTokenCookies(res: Response, accessToken: string, refreshToken: strin
 function clearTokenCookies(res: Response): void {
   res.setHeader('Set-Cookie', [
     buildClearCookieHeader(ACCESS_TOKEN_COOKIE, { path: '/' }),
-    buildClearCookieHeader(REFRESH_TOKEN_COOKIE, { path: '/api/auth/refresh' }),
+    buildClearCookieHeader(REFRESH_TOKEN_COOKIE, { path: '/' }),
   ])
 }
 

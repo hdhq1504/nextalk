@@ -66,7 +66,7 @@ export function MessageBubble({
   const { resolvedTheme } = useTheme()
   const emojiTheme = resolvedTheme === 'dark' ? Theme.DARK : Theme.LIGHT
 
-  const initials = message.sender?.username?.slice(0, 2).toUpperCase() || '??'
+  const initials = message.sender?.username?.slice(0, 1).toUpperCase() || '??'
   const isLong = isLongMessage(message.content || '')
   const isDeleted = message.isDeleted
   const imageUrls =

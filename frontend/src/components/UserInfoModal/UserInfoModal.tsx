@@ -81,7 +81,7 @@ export function UserInfoModal({
     conversation.name || contactUser.username || contactUser.email || 'Unknown'
 
   const avatarUrl = contactUser.avatarUrl
-  const initials = displayName.slice(0, 2).toUpperCase()
+  const initials = displayName.slice(0, 1).toUpperCase()
   const isGroup = conversation.isGroup
   const canShowFriendActions = false
 
@@ -101,7 +101,7 @@ export function UserInfoModal({
     <div className='flex flex-col items-center gap-3'>
       <Avatar size='lg'>
         <AvatarFallback className='bg-primary text-primary-foreground'>
-          {conversation.name?.slice(0, 2).toUpperCase() || 'GP'}
+          {conversation.name?.slice(0, 1).toUpperCase() || 'GP'}
         </AvatarFallback>
       </Avatar>
       <div className='text-center'>

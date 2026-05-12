@@ -20,6 +20,14 @@ interface ChatState {
   setActiveConversation: (conversation: Conversation | null) => void
   fetchMessages: (conversationId: string) => Promise<void>
   createDirectConversation: (friendId: string) => Promise<Conversation>
+  createGroupConversation: (name: string, memberIds: string[]) => Promise<Conversation>
+  addGroupMember: (conversationId: string, userId: string) => Promise<Conversation>
+  removeGroupMember: (conversationId: string, userId: string) => Promise<void>
+  updateGroupInfo: (
+    conversationId: string,
+    data: { name?: string; avatarUrl?: string | null }
+  ) => Promise<Conversation>
+  leaveGroup: (conversationId: string) => Promise<void>
   sendMessage: (
     conversationId: string,
     content: string,
@@ -51,6 +59,7 @@ interface ChatState {
     conversationId: string,
     reactions: ReactionSummary[]
   ) => void
+  removeMemberFromConversation: (conversationId: string, userId: string) => void
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -133,6 +142,93 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ? error.message
             : 'Failed to create conversation',
         isLoading: false
+      })
+      throw error
+    }
+  },
+
+  createGroupConversation: async (name, memberIds) => {
+    set({ isLoading: true, error: null })
+    try {
+      const conversation = await chatService.createGroupConversation(name, memberIds)
+      get().upsertConversation(conversation)
+      get().setActiveConversation(conversation)
+      await get().fetchMessages(conversation.id)
+      set({ isLoading: false })
+      return conversation
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to create group',
+        isLoading: false
+      })
+      throw error
+    }
+  },
+
+  addGroupMember: async (conversationId, userId) => {
+    set({ error: null })
+    try {
+      const conversation = await chatService.addGroupMember(conversationId, userId)
+      get().upsertConversation(conversation)
+      return conversation
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to add member',
+      })
+      throw error
+    }
+  },
+
+  removeGroupMember: async (conversationId, userId) => {
+    set({ error: null })
+    try {
+      await chatService.removeGroupMember(conversationId, userId)
+      get().removeMemberFromConversation(conversationId, userId)
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to remove member',
+      })
+      throw error
+    }
+  },
+
+  updateGroupInfo: async (conversationId, data) => {
+    set({ error: null })
+    try {
+      const conversation = await chatService.updateGroupInfo(conversationId, data)
+      get().upsertConversation(conversation)
+      return conversation
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to update group',
+      })
+      throw error
+    }
+  },
+
+  leaveGroup: async (conversationId) => {
+    set({ error: null })
+    try {
+      await chatService.leaveGroup(conversationId)
+      get().removeMemberFromConversation(conversationId, '')
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to leave group',
       })
       throw error
     }
@@ -294,6 +390,46 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       }
     })
+  },
+
+  removeMemberFromConversation: (conversationId, userId) => {
+    set((state) => {
+      if (!userId) {
+        const updatedConversations = state.conversations.filter(
+          (conv) => conv.id !== conversationId
+        )
+        return {
+          conversations: updatedConversations,
+          activeConversation:
+            state.activeConversation?.id === conversationId
+              ? null
+              : state.activeConversation
+        }
+      }
+
+      const updatedConversations = state.conversations
+        .map((conv) => {
+          if (conv.id !== conversationId) return conv
+          return {
+            ...conv,
+            members: conv.members.filter((m) => m.userId !== userId)
+          }
+        })
+        .filter((conv) => conv.members.length > 0)
+
+      return {
+        conversations: updatedConversations,
+        activeConversation:
+          state.activeConversation?.id === conversationId
+            ? {
+                ...state.activeConversation,
+                members: state.activeConversation.members.filter(
+                  (m) => m.userId !== userId
+                )
+              }
+            : state.activeConversation
+      }
+    })
   }
 }))
 
@@ -342,15 +478,54 @@ export function initializeSocketListeners(): () => void {
       .updateMessageReactions(messageId, conversationId, reactions)
   }
 
+  const handleMemberAdded = (data: unknown) => {
+    const { conversation } = data as {
+      conversationId: string
+      userId: string
+      conversation: unknown
+    }
+    useChatStore
+      .getState()
+      .upsertConversation(
+        normalizeConversation(
+          conversation as Parameters<typeof normalizeConversation>[0]
+        )
+      )
+  }
+
+  const handleMemberRemoved = (data: unknown) => {
+    const { conversationId, userId } = data as {
+      conversationId: string
+      userId: string
+    }
+    useChatStore.getState().removeMemberFromConversation(conversationId, userId)
+  }
+
+  const handleConversationGroupUpdated = (data: unknown) => {
+    useChatStore
+      .getState()
+      .upsertConversation(
+        normalizeConversation(
+          data as Parameters<typeof normalizeConversation>[0]
+        )
+      )
+  }
+
   socketClient.on('message:new', handleNewMessage)
   socketClient.on('conversation:update', handleConversationUpdate)
   socketClient.on('message:recall', handleMessageRecall)
   socketClient.on('message:react', handleMessageReact)
+  socketClient.on('conversation:member_added', handleMemberAdded)
+  socketClient.on('conversation:member_removed', handleMemberRemoved)
+  socketClient.on('conversation:updated', handleConversationGroupUpdated)
 
   return () => {
     socketClient.off('message:new', handleNewMessage)
     socketClient.off('conversation:update', handleConversationUpdate)
     socketClient.off('message:recall', handleMessageRecall)
     socketClient.off('message:react', handleMessageReact)
+    socketClient.off('conversation:member_added', handleMemberAdded)
+    socketClient.off('conversation:member_removed', handleMemberRemoved)
+    socketClient.off('conversation:updated', handleConversationGroupUpdated)
   }
 }

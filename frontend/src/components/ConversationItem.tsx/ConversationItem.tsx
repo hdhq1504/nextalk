@@ -54,7 +54,7 @@ export function ConversationItem({
     'Unknown'
 
   const avatarUrl = otherMember?.user.avatarUrl
-  const initials = displayName.slice(0, 2).toUpperCase()
+  const initials = displayName.slice(0, 1).toUpperCase()
   const lastMessagePreview = conversation.lastMessage
     ? conversation.lastMessage.type === 'image'
       ? conversation.lastMessage.content || 'Ảnh'

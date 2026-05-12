@@ -29,6 +29,8 @@ type ApiConversationMember = {
   userId?: string
   conversationId?: string
   joinedAt?: string
+  role?: 'admin' | 'member'
+  isPinned?: boolean
   user: ApiUser
 }
 
@@ -117,7 +119,9 @@ export function normalizeConversation(
       userId: member.userId ?? member.user.id,
       conversationId: member.conversationId ?? conversation.id,
       joinedAt: member.joinedAt ?? conversation.createdAt,
-      user: normalizeUser(member.user)
+      user: normalizeUser(member.user),
+      role: (member as ApiConversationMember).role,
+      isPinned: (member as ApiConversationMember).isPinned,
     })),
     lastMessage,
     updatedAt:
@@ -186,6 +190,91 @@ export const chatService = {
     return normalizeConversation(
       response.data.data as unknown as ApiConversation
     )
+  },
+
+  async createGroupConversation(
+    name: string,
+    memberIds: string[]
+  ): Promise<Conversation> {
+    const response = await apiClient.post<MessageResponse>(
+      '/conversations/group',
+      { name, memberIds }
+    )
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to create group')
+    }
+
+    if (!response.data.data) {
+      throw new Error('No data returned from server')
+    }
+
+    return normalizeConversation(
+      response.data.data as unknown as ApiConversation
+    )
+  },
+
+  async addGroupMember(
+    conversationId: string,
+    userId: string
+  ): Promise<Conversation> {
+    const response = await apiClient.post<MessageResponse>(
+      `/conversations/${conversationId}/members`,
+      { userId }
+    )
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to add member')
+    }
+
+    if (!response.data.data) {
+      throw new Error('No data returned from server')
+    }
+
+    return normalizeConversation(
+      response.data.data as unknown as ApiConversation
+    )
+  },
+
+  async removeGroupMember(
+    conversationId: string,
+    userId: string
+  ): Promise<void> {
+    const response = await apiClient.delete(`/conversations/${conversationId}/members/${userId}`)
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to remove member')
+    }
+  },
+
+  async updateGroupInfo(
+    conversationId: string,
+    data: { name?: string; avatarUrl?: string }
+  ): Promise<Conversation> {
+    const response = await apiClient.patch<MessageResponse>(
+      `/conversations/${conversationId}`,
+      data
+    )
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to update group')
+    }
+
+    if (!response.data.data) {
+      throw new Error('No data returned from server')
+    }
+
+    return normalizeConversation(
+      response.data.data as unknown as ApiConversation
+    )
+  },
+
+  async leaveGroup(conversationId: string): Promise<void> {
+    const response = await apiClient.post(`/conversations/${conversationId}/leave`)
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to leave group')
+    }
   },
 
   async sendMessage(

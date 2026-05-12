@@ -254,6 +254,16 @@ export interface ServerToClientEvents {
   }) => void;
   "user:online": (data: { userId: string; isOnline: boolean }) => void;
   "conversation:update": (conversation: ConversationResponse) => void;
+  "conversation:member_added": (data: {
+    conversationId: string;
+    userId: string;
+    conversation: ConversationResponse;
+  }) => void;
+  "conversation:member_removed": (data: {
+    conversationId: string;
+    userId: string;
+  }) => void;
+  "conversation:updated": (conversation: ConversationResponse) => void;
   "friend:request:new": (request: FriendRequestResponse) => void;
   "friend:request:update": (request: FriendRequestResponse) => void;
   error: (data: { message: string }) => void;

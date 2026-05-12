@@ -22,8 +22,7 @@ export function setCookie(
   options: CookieOptions = {}
 ): void {
   const {
-    httpOnly = false,
-    secure = true,
+    secure = import.meta.env.PROD,
     sameSite = 'lax',
     maxAge,
     path = '/',
@@ -32,7 +31,6 @@ export function setCookie(
 
   let cookieString = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`
 
-  if (httpOnly) cookieString += '; HttpOnly'
   if (secure) cookieString += '; Secure'
   cookieString += `; SameSite=${sameSite}`
   if (maxAge !== undefined) cookieString += `; Max-Age=${maxAge}`
@@ -49,7 +47,7 @@ export function deleteCookie(
   const { path = '/', domain } = options
 
   let cookieString = `${encodeURIComponent(name)}=`
-
+  cookieString += '; SameSite=lax'
   cookieString += '; Max-Age=0'
   cookieString += `; Path=${path}`
   if (domain) cookieString += `; Domain=${domain}`

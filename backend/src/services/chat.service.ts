@@ -399,6 +399,262 @@ class ChatService {
     }
   }
 
+  private async assertGroupAdmin(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    const member = await prisma.conversationMember.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundError("Conversation not found");
+    }
+
+    if (member.role !== MemberRole.Admin) {
+      throw new AuthorizationError("Only admins can perform this action");
+    }
+  }
+
+  async createGroupConversation(
+    creatorId: string,
+    name: string,
+    memberIds: string[],
+  ): Promise<ConversationResponse> {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      throw new ValidationError("Group name is required");
+    }
+
+    if (memberIds.length < 2) {
+      throw new ValidationError("A group must have at least 2 members");
+    }
+
+    const uniqueMemberIds = [...new Set(memberIds)];
+    if (uniqueMemberIds.includes(creatorId)) {
+      throw new ConflictError("Creator cannot be added as a member");
+    }
+
+    for (const memberId of uniqueMemberIds) {
+      const friendship = await prisma.friendship.findUnique({
+        where: {
+          userId_friendId: {
+            userId: creatorId,
+            friendId: memberId,
+          },
+        },
+      });
+      if (!friendship) {
+        throw new AuthorizationError("You can only add friends to the group");
+      }
+    }
+
+    const conversation = await prisma.conversation.create({
+      data: {
+        type: ConversationType.Group,
+        name: trimmedName,
+        createdById: creatorId,
+        members: {
+          create: [
+            { userId: creatorId, role: MemberRole.Admin },
+            ...uniqueMemberIds.map((id) => ({ userId: id, role: MemberRole.Member })),
+          ],
+        },
+      },
+      include: conversationInclude,
+    });
+
+    return this.formatConversation(conversation);
+  }
+
+  async addGroupMember(
+    conversationId: string,
+    requesterId: string,
+    userId: string,
+  ): Promise<ConversationResponse> {
+    await this.assertGroupAdmin(conversationId, requesterId);
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { type: true },
+    });
+
+    if (!conversation) {
+      throw new NotFoundError("Conversation not found");
+    }
+
+    if (conversation.type !== ConversationType.Group) {
+      throw new ValidationError("This is not a group conversation");
+    }
+
+    const friendship = await prisma.friendship.findUnique({
+      where: {
+        userId_friendId: {
+          userId: requesterId,
+          friendId: userId,
+        },
+      },
+    });
+
+    if (!friendship) {
+      throw new AuthorizationError("You can only add friends to the group");
+    }
+
+    const existing = await prisma.conversationMember.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+    });
+
+    if (existing) {
+      throw new ConflictError("User is already a member of this group");
+    }
+
+    await prisma.conversationMember.create({
+      data: {
+        conversationId,
+        userId,
+        role: MemberRole.Member,
+      },
+    });
+
+    return this.getConversationForMember(conversationId, requesterId);
+  }
+
+  async removeGroupMember(
+    conversationId: string,
+    requesterId: string,
+    userId: string,
+  ): Promise<void> {
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { type: true, createdById: true },
+    });
+
+    if (!conversation) {
+      throw new NotFoundError("Conversation not found");
+    }
+
+    if (conversation.type !== ConversationType.Group) {
+      throw new ValidationError("This is not a group conversation");
+    }
+
+    const member = await prisma.conversationMember.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundError("Member not found");
+    }
+
+    if (userId !== requesterId && member.role !== MemberRole.Admin) {
+      throw new AuthorizationError("Only admins can remove other members");
+    }
+
+    await prisma.conversationMember.delete({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+    });
+  }
+
+  async updateGroupInfo(
+    conversationId: string,
+    requesterId: string,
+    data: { name?: string; avatarUrl?: string },
+  ): Promise<ConversationResponse> {
+    await this.assertGroupAdmin(conversationId, requesterId);
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { type: true },
+    });
+
+    if (!conversation) {
+      throw new NotFoundError("Conversation not found");
+    }
+
+    if (conversation.type !== ConversationType.Group) {
+      throw new ValidationError("This is not a group conversation");
+    }
+
+    const updateData: { name?: string; avatarUrl?: string | null } = {};
+    if (data.name !== undefined) {
+      const trimmedName = data.name.trim();
+      if (!trimmedName) {
+        throw new ValidationError("Group name cannot be empty");
+      }
+      updateData.name = trimmedName;
+    }
+    if (data.avatarUrl !== undefined) {
+      updateData.avatarUrl = data.avatarUrl;
+    }
+
+    const updated = await prisma.conversation.update({
+      where: { id: conversationId },
+      data: updateData,
+      include: conversationInclude,
+    });
+
+    return this.formatConversation(updated);
+  }
+
+  async leaveGroup(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { type: true },
+    });
+
+    if (!conversation) {
+      throw new NotFoundError("Conversation not found");
+    }
+
+    if (conversation.type !== ConversationType.Group) {
+      throw new ValidationError("This is not a group conversation");
+    }
+
+    const member = await prisma.conversationMember.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundError("You are not a member of this group");
+    }
+
+    await prisma.conversationMember.delete({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+    });
+  }
+
   private formatConversationListItem(
     conversation: ConversationWithRelations,
   ): ConversationListItem {

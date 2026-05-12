@@ -63,7 +63,14 @@ export const authService = {
   },
 
   async refreshTokens(): Promise<Tokens> {
-    const response = await apiClient.post<ApiResponse<Tokens>>('/auth/refresh')
+    const refreshToken = this.getRefreshToken()
+    if (!refreshToken) {
+      throw new Error('No refresh token available')
+    }
+
+    const response = await apiClient.post<ApiResponse<Tokens>>('/auth/refresh', {
+      refreshToken
+    })
 
     if (!response.data.success || !response.data.data) {
       throw new Error('Token refresh failed')
@@ -77,8 +84,7 @@ export const authService = {
     localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken)
 
     setCookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, {
-      httpOnly: false,
-      secure: true,
+      secure: import.meta.env.PROD,
       sameSite: 'lax',
       maxAge: 604800
     })

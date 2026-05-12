@@ -23,6 +23,8 @@ export interface ConversationMember {
   user: User
   conversationId: string
   joinedAt: string
+  role?: 'admin' | 'member'
+  isPinned?: boolean
 }
 
 export interface Message {
