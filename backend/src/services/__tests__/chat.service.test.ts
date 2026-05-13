@@ -8,6 +8,7 @@ vi.mock('../../config/database', () => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
     },
     conversationMember: {
       findMany: vi.fn(),
@@ -188,6 +189,211 @@ describe('ChatService', () => {
       await expect(
         chatService.chatService.recallMessage('msg-1', 'user-2')
       ).rejects.toThrow('You can only recall your own messages')
+    })
+  })
+
+  describe('leaveGroup', () => {
+    it('should promote the selected member when admin leaves', async () => {
+      const prisma = (await import('../../config/database')).default
+      const joinedAt = new Date()
+
+      vi.mocked(prisma.conversation.findUnique)
+        .mockResolvedValueOnce({ type: 'group' } as any)
+        .mockResolvedValueOnce({
+          id: 'conv-1',
+          type: 'group',
+          name: 'Team',
+          avatarUrl: null,
+          createdById: 'admin-1',
+          createdAt: joinedAt,
+          members: [
+            {
+              id: 'member-2',
+              conversationId: 'conv-1',
+              userId: 'user-2',
+              role: 'admin',
+              isPinned: false,
+              isHidden: false,
+              joinedAt,
+              user: {
+                id: 'user-2',
+                email: 'user2@example.com',
+                username: 'user2',
+                avatarUrl: null,
+                isOnline: false,
+                lastSeen: null,
+                createdAt: joinedAt,
+              },
+            },
+          ],
+          messages: [],
+        } as any)
+
+      vi.mocked(prisma.conversationMember.findUnique).mockResolvedValue({
+        id: 'member-1',
+        conversationId: 'conv-1',
+        userId: 'admin-1',
+        role: 'admin',
+      } as any)
+      vi.mocked(prisma.conversationMember.findMany).mockResolvedValue([
+        {
+          id: 'member-2',
+          conversationId: 'conv-1',
+          userId: 'user-2',
+          role: 'member',
+          joinedAt,
+        },
+      ] as any)
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) =>
+        callback(prisma)
+      )
+
+      const chatService = await import('../chat.service')
+      const result = await chatService.chatService.leaveGroup(
+        'conv-1',
+        'admin-1',
+        'user-2'
+      )
+
+      expect(prisma.conversationMember.delete).toHaveBeenCalledWith({
+        where: {
+          conversationId_userId: {
+            conversationId: 'conv-1',
+            userId: 'admin-1',
+          },
+        },
+      })
+      expect(prisma.conversationMember.update).toHaveBeenCalledWith({
+        where: { id: 'member-2' },
+        data: { role: 'admin' },
+      })
+      expect(result?.members?.[0].role).toBe('admin')
+    })
+
+    it('should require admin to choose the next admin before leaving', async () => {
+      const prisma = (await import('../../config/database')).default
+
+      vi.mocked(prisma.conversation.findUnique).mockResolvedValue({
+        type: 'group',
+      } as any)
+      vi.mocked(prisma.conversationMember.findUnique).mockResolvedValue({
+        id: 'member-1',
+        conversationId: 'conv-1',
+        userId: 'admin-1',
+        role: 'admin',
+      } as any)
+      vi.mocked(prisma.conversationMember.findMany).mockResolvedValue([
+        {
+          id: 'member-2',
+          conversationId: 'conv-1',
+          userId: 'user-2',
+          role: 'member',
+        },
+      ] as any)
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) =>
+        callback(prisma)
+      )
+
+      const chatService = await import('../chat.service')
+
+      await expect(
+        chatService.chatService.leaveGroup('conv-1', 'admin-1')
+      ).rejects.toThrow('Please choose a new admin before leaving')
+    })
+
+    it('should not promote another member when a regular member leaves', async () => {
+      const prisma = (await import('../../config/database')).default
+
+      vi.mocked(prisma.conversation.findUnique).mockResolvedValue({
+        type: 'group',
+      } as any)
+      vi.mocked(prisma.conversationMember.findUnique).mockResolvedValue({
+        id: 'member-2',
+        conversationId: 'conv-1',
+        userId: 'user-2',
+        role: 'member',
+      } as any)
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) =>
+        callback(prisma)
+      )
+
+      const chatService = await import('../chat.service')
+      const result = await chatService.chatService.leaveGroup('conv-1', 'user-2')
+
+      expect(prisma.conversationMember.findMany).not.toHaveBeenCalled()
+      expect(prisma.conversationMember.update).not.toHaveBeenCalled()
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('deleteConversation', () => {
+    it('should throw if a non-admin deletes a group conversation', async () => {
+      const prisma = (await import('../../config/database')).default
+
+      vi.mocked(prisma.conversation.findUnique).mockResolvedValue({
+        id: 'conv-1',
+        type: 'group',
+        members: [
+          {
+            userId: 'user-1',
+            role: 'member',
+          },
+        ],
+      } as any)
+
+      const chatService = await import('../chat.service')
+
+      await expect(
+        chatService.chatService.deleteConversation('conv-1', 'user-1')
+      ).rejects.toThrow('Only admins can delete this conversation')
+      expect(prisma.conversation.delete).not.toHaveBeenCalled()
+    })
+
+    it('should delete a conversation when requester is allowed', async () => {
+      const prisma = (await import('../../config/database')).default
+
+      vi.mocked(prisma.conversation.findUnique).mockResolvedValue({
+        id: 'conv-1',
+        type: 'group',
+        members: [
+          {
+            userId: 'admin-1',
+            role: 'admin',
+          },
+        ],
+      } as any)
+
+      const chatService = await import('../chat.service')
+      await chatService.chatService.deleteConversation('conv-1', 'admin-1')
+
+      expect(prisma.conversation.delete).toHaveBeenCalledWith({
+        where: { id: 'conv-1' },
+      })
+    })
+  })
+
+  describe('removeConversation', () => {
+    it('should hide the conversation for the current member', async () => {
+      const prisma = (await import('../../config/database')).default
+
+      vi.mocked(prisma.conversationMember.findUnique).mockResolvedValue({
+        id: 'member-1',
+        conversationId: 'conv-1',
+        userId: 'user-1',
+      } as any)
+
+      const chatService = await import('../chat.service')
+      await chatService.chatService.removeConversation('conv-1', 'user-1')
+
+      expect(prisma.conversationMember.update).toHaveBeenCalledWith({
+        where: {
+          conversationId_userId: {
+            conversationId: 'conv-1',
+            userId: 'user-1',
+          },
+        },
+        data: { isHidden: true },
+      })
     })
   })
 })

@@ -168,6 +168,10 @@ const addMemberSchema = z.object({
   userId: z.string().uuid('Invalid user ID'),
 })
 
+const leaveGroupSchema = z.object({
+  newAdminId: z.string().uuid('Invalid admin ID').optional(),
+})
+
 const updateGroupSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   avatarUrl: z.string().url().optional(),
@@ -258,10 +262,42 @@ export const updateGroupInfo = asyncHandler(
   }
 )
 
+export const deleteConversation = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response<ApiResponse>) => {
+    const { id } = validate(conversationIdSchema, req.params)
+    await chatService.deleteConversation(id, req.user!.userId)
+
+    const io = getSocketServer()
+    if (io) {
+      io.to(getConversationRoom(id)).emit('conversation:deleted', {
+        conversationId: id,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Conversation deleted successfully',
+    })
+  }
+)
+
+export const removeConversation = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response<ApiResponse>) => {
+    const { id } = validate(conversationIdSchema, req.params)
+    await chatService.removeConversation(id, req.user!.userId)
+
+    res.status(200).json({
+      success: true,
+      message: 'Conversation removed successfully',
+    })
+  }
+)
+
 export const leaveGroup = asyncHandler(
   async (req: AuthenticatedRequest, res: Response<ApiResponse>) => {
     const { id } = validate(conversationIdSchema, req.params)
-    await chatService.leaveGroup(id, req.user!.userId)
+    const { newAdminId } = validate(leaveGroupSchema, req.body ?? {})
+    const conversation = await chatService.leaveGroup(id, req.user!.userId, newAdminId)
 
     const io = getSocketServer()
     if (io) {
@@ -269,6 +305,10 @@ export const leaveGroup = asyncHandler(
         conversationId: id,
         userId: req.user!.userId,
       })
+
+      if (conversation) {
+        emitToConversationMembers(io, conversation, 'conversation:updated', conversation)
+      }
     }
 
     res.status(200).json({

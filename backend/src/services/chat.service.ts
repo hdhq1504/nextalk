@@ -663,7 +663,66 @@ class ChatService {
     return this.formatConversation(updated);
   }
 
-  async leaveGroup(conversationId: string, userId: string): Promise<void> {
+  async deleteConversation(conversationId: string, userId: string): Promise<void> {
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { members: true },
+    });
+
+    if (!conversation) {
+      throw new NotFoundError("Conversation not found");
+    }
+
+    const member = conversation.members.find(
+      (conversationMember) => conversationMember.userId === userId,
+    );
+
+    if (!member) {
+      throw new NotFoundError("Conversation not found");
+    }
+
+    if (
+      conversation.type === ConversationType.Group &&
+      member.role !== MemberRole.Admin
+    ) {
+      throw new AuthorizationError("Only admins can delete this conversation");
+    }
+
+    await prisma.conversation.delete({
+      where: { id: conversationId },
+    });
+  }
+
+  async removeConversation(conversationId: string, userId: string): Promise<void> {
+    const member = await prisma.conversationMember.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundError("Conversation not found");
+    }
+
+    await prisma.conversationMember.update({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+      data: { isHidden: true },
+    });
+  }
+
+  async leaveGroup(
+    conversationId: string,
+    userId: string,
+    newAdminId?: string,
+  ): Promise<ConversationResponse | null> {
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
       select: { type: true },
@@ -690,14 +749,58 @@ class ChatService {
       throw new NotFoundError("You are not a member of this group");
     }
 
-    await prisma.conversationMember.delete({
-      where: {
-        conversationId_userId: {
-          conversationId,
-          userId,
+    const updatedConversation = await prisma.$transaction(async (tx) => {
+      await tx.conversationMember.delete({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId,
+          },
         },
-      },
+      });
+
+      if (member.role !== MemberRole.Admin) {
+        return null;
+      }
+
+      const remainingMembers = await tx.conversationMember.findMany({
+        where: { conversationId },
+      });
+
+      if (remainingMembers.length === 0) {
+        return null;
+      }
+
+      if (!newAdminId) {
+        throw new ValidationError("Please choose a new admin before leaving");
+      }
+
+      if (newAdminId === userId) {
+        throw new ValidationError("New admin must be another group member");
+      }
+
+      const nextAdmin = remainingMembers.find(
+        (remainingMember) => remainingMember.userId === newAdminId,
+      );
+
+      if (!nextAdmin) {
+        throw new ValidationError("New admin must be a member of this group");
+      }
+
+      await tx.conversationMember.update({
+        where: { id: nextAdmin.id },
+        data: { role: MemberRole.Admin },
+      });
+
+      return tx.conversation.findUnique({
+        where: { id: conversationId },
+        include: conversationInclude,
+      });
     });
+
+    return updatedConversation
+      ? this.formatConversation(updatedConversation)
+      : null;
   }
 
   private formatConversationListItem(

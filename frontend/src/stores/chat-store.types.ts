@@ -30,6 +30,8 @@ export interface ChatState {
   createGroupConversation: ChatServiceMethod<'createGroupConversation'>
   addGroupMember: ChatServiceMethod<'addGroupMember'>
   removeGroupMember: ChatServiceMethod<'removeGroupMember'>
+  deleteConversation: ChatServiceMethod<'deleteConversation'>
+  removeConversation: ChatServiceMethod<'removeConversation'>
   updateGroupInfo: ChatServiceMethod<'updateGroupInfo'>
   leaveGroup: ChatServiceMethod<'leaveGroup'>
   sendMessage: (
@@ -65,5 +67,6 @@ export interface ChatState {
     reactions: Message['reactions']
   ) => void
   removeMemberFromConversation: (conversationId: string, userId: string) => void
+  removeConversationFromStore: (conversationId: string) => void
   resetStore: () => void
 }

@@ -302,6 +302,24 @@ export const chatService = {
     }
   },
 
+  async deleteConversation(conversationId: string): Promise<void> {
+    const response = await apiClient.delete(`/conversations/${conversationId}`)
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to delete conversation')
+    }
+  },
+
+  async removeConversation(conversationId: string): Promise<void> {
+    const response = await apiClient.post(
+      `/conversations/${conversationId}/remove`
+    )
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to remove conversation')
+    }
+  },
+
   async updateGroupInfo(
     conversationId: string,
     data: UpdateGroupInfoRequest
@@ -324,9 +342,10 @@ export const chatService = {
     )
   },
 
-  async leaveGroup(conversationId: string): Promise<void> {
+  async leaveGroup(conversationId: string, newAdminId?: string): Promise<void> {
     const response = await apiClient.post(
-      `/conversations/${conversationId}/leave`
+      `/conversations/${conversationId}/leave`,
+      newAdminId ? { newAdminId } : {}
     )
 
     if (!response.data.success) {

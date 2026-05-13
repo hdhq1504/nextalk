@@ -273,6 +273,7 @@ export interface ServerToClientEvents {
     conversationId: string;
     userId: string;
   }) => void;
+  "conversation:deleted": (data: { conversationId: string }) => void;
   "conversation:updated": (conversation: ConversationResponse) => void;
   "friend:request:new": (request: FriendRequestResponse) => void;
   "friend:request:update": (request: FriendRequestResponse) => void;

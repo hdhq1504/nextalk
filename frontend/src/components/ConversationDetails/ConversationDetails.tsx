@@ -7,10 +7,13 @@ import {
   Search,
   UserPlus,
   UserMinus,
+  UserX,
   LogOut,
   Pencil
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useChatStore } from '@/stores/chat-store'
 import { getConversationDisplayInfo } from '@/utils/conversation'
 import { getInitials } from '@/utils/format'
 import type { Conversation } from '@/types/chat'
@@ -49,6 +52,8 @@ export function ConversationDetails({
   const [selectedMember, setSelectedMember] = useState<
     Conversation['members'][number] | null
   >(null)
+  const deleteConversation = useChatStore((state) => state.deleteConversation)
+  const removeConversation = useChatStore((state) => state.removeConversation)
 
   if (!open || !conversation) return null
 
@@ -73,6 +78,32 @@ export function ConversationDetails({
 
   const handleLeaveGroup = () => {
     setShowLeave(true)
+  }
+
+  const handleDeleteConversation = async () => {
+    if (!window.confirm('Delete this conversation for everyone?')) return
+
+    try {
+      await deleteConversation(conversation.id)
+      toast.success('Conversation deleted')
+      onClose()
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to delete conversation'
+      )
+    }
+  }
+
+  const handleRemoveConversation = async () => {
+    try {
+      await removeConversation(conversation.id)
+      toast.success('Conversation removed from list')
+      onClose()
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to remove conversation'
+      )
+    }
   }
 
   return (
@@ -245,6 +276,15 @@ export function ConversationDetails({
               <div className='space-y-1'>
                 <button
                   type='button'
+                  onClick={handleRemoveConversation}
+                  className='text-destructive hover:bg-destructive/10 flex w-full items-center gap-3 rounded-md p-2 text-sm'
+                >
+                  <UserX className='size-5' />
+                  <span>Remove from list</span>
+                </button>
+                <button
+                  type='button'
+                  onClick={handleDeleteConversation}
                   className='text-destructive hover:bg-destructive/10 flex w-full items-center gap-3 rounded-md p-2 text-sm'
                 >
                   <Trash2 className='size-5' />
@@ -276,6 +316,7 @@ export function ConversationDetails({
         open={showLeave}
         onOpenChange={setShowLeave}
         conversation={conversation}
+        currentUserId={currentUserId}
       />
     </>
   )

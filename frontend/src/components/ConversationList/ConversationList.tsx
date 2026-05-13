@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { toast } from 'sonner'
 import { useChatStore } from '@/stores/chat-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -22,7 +23,9 @@ export function ConversationList({
     activeConversation,
     isLoading,
     setActiveConversation,
-    fetchMessages
+    fetchMessages,
+    deleteConversation,
+    removeConversation
   } = useChatStore()
   const user = useAuthStore((state) => state.user)
 
@@ -42,6 +45,30 @@ export function ConversationList({
       setActiveConversation(conversation)
       fetchMessages(conversationId)
       onConversationClick?.()
+    }
+  }
+
+  const handleDeleteConversation = async (conversationId: string) => {
+    if (!window.confirm('Delete this conversation for everyone?')) return
+
+    try {
+      await deleteConversation(conversationId)
+      toast.success('Conversation deleted')
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to delete conversation'
+      )
+    }
+  }
+
+  const handleRemoveConversation = async (conversationId: string) => {
+    try {
+      await removeConversation(conversationId)
+      toast.success('Conversation removed from list')
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to remove conversation'
+      )
     }
   }
 
@@ -188,6 +215,8 @@ export function ConversationList({
                 isActive={activeConversation?.id === conversation.id}
                 currentUserId={user?.id || ''}
                 onClick={() => handleSelectConversation(conversation.id)}
+                onDelete={() => handleDeleteConversation(conversation.id)}
+                onRemove={() => handleRemoveConversation(conversation.id)}
               />
             </div>
           ))

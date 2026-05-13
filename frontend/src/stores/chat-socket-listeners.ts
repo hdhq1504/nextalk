@@ -74,6 +74,13 @@ export function initializeSocketListeners(): () => void {
     useChatStore.getState().removeMemberFromConversation(conversationId, userId)
   }
 
+  const handleConversationDeleted = (data: unknown) => {
+    const { conversationId } = data as {
+      conversationId: string
+    }
+    useChatStore.getState().removeConversationFromStore(conversationId)
+  }
+
   const handleConversationGroupUpdated = (data: unknown) => {
     useChatStore
       .getState()
@@ -90,6 +97,7 @@ export function initializeSocketListeners(): () => void {
   socketClient.on('message:react', handleMessageReact)
   socketClient.on('conversation:member_added', handleMemberAdded)
   socketClient.on('conversation:member_removed', handleMemberRemoved)
+  socketClient.on('conversation:deleted', handleConversationDeleted)
   socketClient.on('conversation:updated', handleConversationGroupUpdated)
 
   socketClient.setReconnectHandler(() => {
@@ -104,6 +112,7 @@ export function initializeSocketListeners(): () => void {
     socketClient.off('message:react', handleMessageReact)
     socketClient.off('conversation:member_added', handleMemberAdded)
     socketClient.off('conversation:member_removed', handleMemberRemoved)
+    socketClient.off('conversation:deleted', handleConversationDeleted)
     socketClient.off('conversation:updated', handleConversationGroupUpdated)
   }
 

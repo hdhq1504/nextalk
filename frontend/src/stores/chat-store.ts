@@ -245,6 +245,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  deleteConversation: async (conversationId) => {
+    set({ error: null })
+    try {
+      await chatService.deleteConversation(conversationId)
+      get().removeConversationFromStore(conversationId)
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to delete conversation'
+      })
+      throw error
+    }
+  },
+
+  removeConversation: async (conversationId) => {
+    set({ error: null })
+    try {
+      await chatService.removeConversation(conversationId)
+      get().removeConversationFromStore(conversationId)
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to remove conversation'
+      })
+      throw error
+    }
+  },
+
   updateGroupInfo: async (conversationId, data) => {
     set({ error: null })
     try {
@@ -537,6 +569,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 )
               }
             : state.activeConversation
+      }
+    })
+  },
+
+  removeConversationFromStore: (conversationId) => {
+    set((state) => {
+      const messages = { ...state.messages }
+      const messageCursors = { ...state.messageCursors }
+      const hasMoreMessages = { ...state.hasMoreMessages }
+
+      delete messages[conversationId]
+      delete messageCursors[conversationId]
+      delete hasMoreMessages[conversationId]
+
+      return {
+        conversations: state.conversations.filter(
+          (conversation) => conversation.id !== conversationId
+        ),
+        activeConversation:
+          state.activeConversation?.id === conversationId
+            ? null
+            : state.activeConversation,
+        messages,
+        messageCursors,
+        hasMoreMessages
       }
     })
   },

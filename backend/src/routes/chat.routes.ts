@@ -12,6 +12,8 @@ import {
   removeGroupMember,
   updateGroupInfo,
   leaveGroup,
+  deleteConversation,
+  removeConversation,
 } from '../controllers/chat.controller'
 import { authenticate } from '../middlewares/auth.middleware'
 
@@ -27,6 +29,8 @@ router.patch('/messages/:messageId/recall', authenticate, recallMessage)
 router.post('/messages/:messageId/reactions', authenticate, reactMessage)
 router.post('/:id/members', authenticate, addGroupMember)
 router.delete('/:id/members/:userId', authenticate, removeGroupMember)
+router.post('/:id/remove', authenticate, removeConversation)
+router.delete('/:id', authenticate, deleteConversation)
 router.patch('/:id', authenticate, updateGroupInfo)
 router.post('/:id/leave', authenticate, leaveGroup)
 

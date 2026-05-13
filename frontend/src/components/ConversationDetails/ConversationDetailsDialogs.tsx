@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import type { Conversation } from '@/types/chat'
 import { useChatStore } from '@/stores/chat-store'
+import { cn } from '@/lib/utils'
+import { getInitials } from '@/utils/format'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -198,20 +201,31 @@ export function RenameGroupDialog({
 export function LeaveGroupDialog({
   open,
   onOpenChange,
-  conversation
+  conversation,
+  currentUserId
 }: DialogControlProps & {
   conversation: Conversation | null
+  currentUserId: string
 }) {
   const [isLoading, setIsLoading] = useState(false)
+  const [newAdminId, setNewAdminId] = useState('')
   const leaveGroup = useChatStore((state) => state.leaveGroup)
+  const currentMember = conversation?.members.find(
+    (member) => member.userId === currentUserId
+  )
+  const isCurrentUserAdmin = currentMember?.role === 'admin'
+  const adminCandidates =
+    conversation?.members.filter((member) => member.userId !== currentUserId) ??
+    []
 
   const handleLeave = async () => {
     if (!conversation) return
     setIsLoading(true)
     try {
-      await leaveGroup(conversation.id)
+      await leaveGroup(conversation.id, newAdminId || undefined)
       toast.success('You left the group')
       onOpenChange(false)
+      setNewAdminId('')
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to leave group'
@@ -221,19 +235,72 @@ export function LeaveGroupDialog({
     }
   }
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setNewAdminId('')
+    }
+    onOpenChange(nextOpen)
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Leave Group</DialogTitle>
           <DialogDescription>
-            Are you sure you want to leave {conversation?.name || 'this group'}?
+            {isCurrentUserAdmin && adminCandidates.length > 0
+              ? 'Choose a new admin before leaving the group.'
+              : `Are you sure you want to leave ${conversation?.name || 'this group'}?`}
           </DialogDescription>
         </DialogHeader>
+        {isCurrentUserAdmin && adminCandidates.length > 0 && (
+          <div className='space-y-2'>
+            {adminCandidates.map((member) => {
+              const selected = member.userId === newAdminId
+
+              return (
+                <button
+                  key={member.userId}
+                  type='button'
+                  onClick={() => setNewAdminId(member.userId)}
+                  disabled={isLoading}
+                  className={cn(
+                    'hover:bg-accent flex w-full items-center gap-3 rounded-md border p-2 text-left',
+                    selected && 'border-primary bg-primary/5'
+                  )}
+                >
+                  <Avatar size='sm'>
+                    {member.user.avatarUrl && (
+                      <AvatarImage
+                        src={member.user.avatarUrl}
+                        alt={member.user.username}
+                      />
+                    )}
+                    <AvatarFallback>
+                      {member.user.username
+                        ? getInitials(member.user.username)
+                        : 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className='min-w-0 flex-1 truncate text-sm font-medium'>
+                    {member.user.username || member.user.email || 'Unknown'}
+                  </span>
+                  <span
+                    className={cn(
+                      'size-3 rounded-full border',
+                      selected && 'border-primary bg-primary'
+                    )}
+                    aria-hidden='true'
+                  />
+                </button>
+              )
+            })}
+          </div>
+        )}
         <DialogFooter>
           <Button
             variant='outline'
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
             disabled={isLoading}
           >
             Cancel
@@ -241,7 +308,10 @@ export function LeaveGroupDialog({
           <Button
             variant='destructive'
             onClick={handleLeave}
-            disabled={isLoading}
+            disabled={
+              isLoading ||
+              (isCurrentUserAdmin && adminCandidates.length > 0 && !newAdminId)
+            }
           >
             Leave
           </Button>

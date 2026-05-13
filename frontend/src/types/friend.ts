@@ -3,7 +3,9 @@ import type { User } from '@/types/auth'
 export type UserSearchResult = Pick<
   User,
   'id' | 'username' | 'email' | 'avatarUrl' | 'createdAt'
->
+> & {
+  requestSent?: boolean
+}
 
 export interface FriendRequest {
   id: string

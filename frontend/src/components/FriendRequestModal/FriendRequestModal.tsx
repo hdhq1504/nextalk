@@ -120,10 +120,19 @@ export function FriendRequestModal({
                     <Button
                       size='sm'
                       onClick={() => handleSendRequest(user.id)}
-                      disabled={sendingRequestId === user.id}
+                      disabled={
+                        sendingRequestId === user.id || user.requestSent
+                      }
+                      aria-label={
+                        user.requestSent
+                          ? 'Friend request sent'
+                          : 'Send friend request'
+                      }
                     >
                       {sendingRequestId === user.id ? (
                         <Loader2 className='size-4 animate-spin' />
+                      ) : user.requestSent ? (
+                        <Check className='size-4' />
                       ) : (
                         <UserPlus className='size-4' />
                       )}
