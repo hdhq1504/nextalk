@@ -15,11 +15,21 @@ const app: Application = express()
 app.use(helmet())
 
 // CORS Configuration
-const corsOrigin = process.env.CORS_ORIGIN;
-if (!corsOrigin) throw new Error('CORS_ORIGIN environment variable is required');
+const corsOriginEnv = process.env.CORS_ORIGIN;
+if (!corsOriginEnv) throw new Error('CORS_ORIGIN environment variable is required');
+
+// Support comma-separated list of origins (e.g. "https://example.com,http://localhost:5173")
+const allowedOrigins = corsOriginEnv.split(',').map((o) => o.trim())
 
 const corsOptions: cors.CorsOptions = {
-  origin: corsOrigin,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. mobile apps, curl, Postman)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error(`CORS: origin '${origin}' not allowed`))
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
