@@ -12,6 +12,9 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
+# Build TypeScript to JavaScript
+RUN npm run build
+
 EXPOSE 4000
 
-CMD ["npm", "run", "dev"]
+CMD ["npm", "start"]
