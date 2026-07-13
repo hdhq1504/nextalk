@@ -198,242 +198,251 @@ export function MessageBubble({
   return (
     <div
       className={cn(
-        'flex items-end gap-2',
-        isOwn ? 'flex-row-reverse' : 'flex-row',
+        'flex flex-col w-full',
+        isOwn ? 'items-end' : 'items-start',
         className
       )}
     >
-      {!isOwn && showAvatar && (
-        <Avatar size='default' className='shrink-0'>
-          {message.sender?.avatarUrl && (
-            <AvatarImage
-              src={message.sender.avatarUrl}
-              alt={message.sender.username}
-            />
-          )}
-          <AvatarFallback>{initials}</AvatarFallback>
-        </Avatar>
+      {!isOwn && senderName && (
+        <span className='text-muted-foreground mb-1 ml-10 text-xs'>
+          {senderName}
+        </span>
       )}
 
       <div
         className={cn(
-          'max-w-[92%] sm:max-w-[70%]',
-          isOwn ? 'items-end' : 'items-start'
+          'flex items-end gap-2 max-w-[92%] sm:max-w-[70%]',
+          isOwn ? 'flex-row-reverse' : 'flex-row'
         )}
       >
-        {!isOwn && senderName && (
-          <span className='text-muted-foreground mb-1 block text-xs'>
-            {senderName}
-          </span>
-        )}
-
-        {message.replyTo && (
-          <div className='border-primary/50 bg-muted/30 mb-1 w-full max-w-[250px] rounded-lg border-l-2 px-2 py-1 text-xs'>
-            <p className='text-foreground font-medium'>
-              {message.replyTo.sender?.username || 'Unknown'}
-            </p>
-            <p className='text-muted-foreground truncate'>
-              {message.replyTo.type === 'image'
-                ? 'Image'
-                : message.replyTo.content || ''}
-            </p>
-          </div>
-        )}
-
-        <div
-          className={cn(
-            'group flex items-center gap-1.5',
-            isOwn ? 'flex-row-reverse' : 'flex-row'
-          )}
-          onMouseEnter={() => setShowActions(true)}
-          onMouseLeave={() => {
-            setShowActions(false)
-            setShowReactionPicker(false)
-          }}
-        >
-          {isImage ? (
-            <div
-              className={cn(
-                'flex max-w-[300px] flex-col gap-1',
-                isOwn ? 'items-end' : 'items-start'
+        {!isOwn && (
+          showAvatar ? (
+            <Avatar size='default' className='shrink-0'>
+              {message.sender?.avatarUrl && (
+                <AvatarImage
+                  src={message.sender.avatarUrl}
+                  alt={message.sender.username}
+                />
               )}
-            >
-              <div className='overflow-hidden rounded-xl'>
-                <ImageGrid imageUrls={imageUrls} onImageClick={onImageClick} />
-              </div>
-              {message.content && (
-                <div
-                  className={cn(
-                    'w-fit max-w-full px-3 py-2 text-sm',
-                    isLong ? 'rounded-xl' : 'rounded-full',
-                    isOwn
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-secondary text-foreground'
-                  )}
-                >
-                  <p className='wrap-break-word whitespace-pre-wrap'>
-                    {message.content}
-                  </p>
-                </div>
-              )}
-            </div>
+              <AvatarFallback>{initials}</AvatarFallback>
+            </Avatar>
           ) : (
-            <div
-              className={cn(
-                'px-3 py-2 text-sm',
-                isLong ? 'rounded-xl' : 'rounded-full',
-                isOwn
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-foreground'
-              )}
-            >
-              <p className='wrap-break-word whitespace-pre-wrap'>
-                {message.content}
+            <div className='w-8 shrink-0' />
+          )
+        )}
+
+        <div className={cn('flex flex-col', isOwn ? 'items-end' : 'items-start')}>
+          {message.replyTo && (
+            <div className='border-primary/50 bg-muted/30 mb-1 w-full max-w-[250px] rounded-lg border-l-2 px-2 py-1 text-xs'>
+              <p className='text-foreground font-medium'>
+                {message.replyTo.sender?.username || 'Unknown'}
+              </p>
+              <p className='text-muted-foreground truncate'>
+                {message.replyTo.type === 'image'
+                  ? 'Image'
+                  : message.replyTo.content || ''}
               </p>
             </div>
           )}
 
           <div
             className={cn(
-              'bg-background/90 flex shrink-0 items-center gap-0.5 rounded-full px-1 py-0.5 shadow-sm transition-opacity',
-              showActions ? 'opacity-100' : 'pointer-events-none opacity-0'
+              'group flex items-center gap-1.5',
+              isOwn ? 'flex-row-reverse' : 'flex-row'
             )}
-            aria-hidden={!showActions}
+            onMouseEnter={() => setShowActions(true)}
+            onMouseLeave={() => {
+              setShowActions(false)
+              setShowReactionPicker(false)
+            }}
           >
-            <Button
-              type='button'
-              variant='ghost'
-              size='icon'
-              className='h-6 w-6'
-              tabIndex={showActions ? 0 : -1}
-              onClick={() => onReply(message)}
-            >
-              <MessageSquare className='h-3.5 w-3.5' />
-            </Button>
+            {isImage ? (
+              <div
+                className={cn(
+                  'flex max-w-[300px] flex-col gap-1',
+                  isOwn ? 'items-end' : 'items-start'
+                )}
+              >
+                <div className='overflow-hidden rounded-xl'>
+                  <ImageGrid imageUrls={imageUrls} onImageClick={onImageClick} />
+                </div>
+                {message.content && (
+                  <div
+                    className={cn(
+                      'w-fit max-w-full px-3 py-2 text-sm',
+                      isLong ? 'rounded-xl' : 'rounded-full',
+                      isOwn
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-secondary text-foreground'
+                    )}
+                  >
+                    <p className='wrap-break-word whitespace-pre-wrap'>
+                      {message.content}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div
+                className={cn(
+                  'px-3 py-2 text-sm',
+                  isLong ? 'rounded-xl' : 'rounded-full',
+                  isOwn
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-foreground'
+                )}
+              >
+                <p className='wrap-break-word whitespace-pre-wrap'>
+                  {message.content}
+                </p>
+              </div>
+            )}
 
-            <div className='relative'>
+            <div
+              className={cn(
+                'bg-background/90 flex shrink-0 items-center gap-0.5 rounded-full px-1 py-0.5 shadow-sm transition-opacity',
+                showActions ? 'opacity-100' : 'pointer-events-none opacity-0'
+              )}
+              aria-hidden={!showActions}
+            >
               <Button
-                ref={reactionButtonRef}
                 type='button'
                 variant='ghost'
                 size='icon'
                 className='h-6 w-6'
                 tabIndex={showActions ? 0 : -1}
-                onClick={toggleReactionPicker}
+                onClick={() => onReply(message)}
               >
-                <Smile className='h-3.5 w-3.5' />
+                <MessageSquare className='h-3.5 w-3.5' />
               </Button>
 
-              {showReactionPicker && reactionPickerPosition && (
-                <div
-                  className='fixed z-50 w-max'
-                  style={{
-                    top: reactionPickerPosition.top,
-                    left: reactionPickerPosition.left
-                  }}
+              <div className='relative'>
+                <Button
+                  ref={reactionButtonRef}
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='h-6 w-6'
+                  tabIndex={showActions ? 0 : -1}
+                  onClick={toggleReactionPicker}
                 >
+                  <Smile className='h-3.5 w-3.5' />
+                </Button>
+
+                {showReactionPicker && reactionPickerPosition && (
                   <div
-                    className='fixed inset-0'
-                    onClick={() => setShowReactionPicker(false)}
-                  />
-                  <div className='bg-background rounded-lg border p-2 shadow-lg'>
-                    <div className='flex gap-1'>
-                      {PRESET_REACTION_EMOJIS.map((emoji) => (
-                        <button
-                          key={emoji}
-                          onClick={() => handleReactionClick(emoji)}
-                          className='hover:bg-muted rounded p-1 text-lg transition-colors'
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                      <div className='relative'>
-                        <Button
-                          type='button'
-                          variant='ghost'
-                          size='icon'
-                          className='h-7 w-7'
-                          onClick={() => {}}
-                        >
-                          <Plus className='h-3.5 w-3.5' />
-                        </Button>
-                        <div
-                          className={cn(
-                            'absolute hidden group-hover:block',
-                            reactionPickerPosition.placement === 'bottom'
-                              ? 'top-full mt-2'
-                              : 'bottom-full mb-2',
-                            'right-0'
-                          )}
-                        >
-                          <EmojiPicker
-                            onEmojiClick={handleEmojiClick}
-                            theme={emojiTheme}
-                            skinTonesDisabled={false}
-                            searchDisabled
-                            previewConfig={{ showPreview: false }}
-                            width={280}
-                            height={350}
-                          />
+                    className='fixed z-50 w-max'
+                    style={{
+                      top: reactionPickerPosition.top,
+                      left: reactionPickerPosition.left
+                    }}
+                  >
+                    <div
+                      className='fixed inset-0'
+                      onClick={() => setShowReactionPicker(false)}
+                    />
+                    <div className='relative z-10 bg-background rounded-lg border p-2 shadow-lg'>
+                      <div className='flex gap-1'>
+                        {PRESET_REACTION_EMOJIS.map((emoji) => (
+                          <button
+                            key={emoji}
+                            onClick={() => handleReactionClick(emoji)}
+                            className='hover:bg-muted rounded p-1 text-lg transition-colors'
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                        <div className='relative'>
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            size='icon'
+                            className='h-7 w-7'
+                            onClick={() => {}}
+                          >
+                            <Plus className='h-3.5 w-3.5' />
+                          </Button>
+                          <div
+                            className={cn(
+                              'absolute hidden group-hover:block',
+                              reactionPickerPosition.placement === 'bottom'
+                                ? 'top-full mt-2'
+                                : 'bottom-full mb-2',
+                              'right-0'
+                            )}
+                          >
+                            <EmojiPicker
+                              onEmojiClick={handleEmojiClick}
+                              theme={emojiTheme}
+                              skinTonesDisabled={false}
+                              searchDisabled
+                              previewConfig={{ showPreview: false }}
+                              width={280}
+                              height={350}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
+              </div>
+
+              {isOwn && (
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='text-destructive hover:text-destructive h-6 w-6'
+                  tabIndex={showActions ? 0 : -1}
+                  onClick={() => setShowRecallDialog(true)}
+                >
+                  <RotateCcw className='h-3.5 w-3.5' />
+                </Button>
               )}
             </div>
-
-            {isOwn && (
-              <Button
-                type='button'
-                variant='ghost'
-                size='icon'
-                className='text-destructive hover:text-destructive h-6 w-6'
-                tabIndex={showActions ? 0 : -1}
-                onClick={() => setShowRecallDialog(true)}
-              >
-                <RotateCcw className='h-3.5 w-3.5' />
-              </Button>
-            )}
           </div>
-        </div>
-
-        {message.reactions && message.reactions.length > 0 && (
-          <div className='mt-1 flex flex-wrap gap-1'>
-            {message.reactions.map((reaction) => (
-              <button
-                key={reaction.emoji}
-                onClick={() => handleReactionClick(reaction.emoji)}
-                className={cn(
-                  'flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs transition-colors',
-                  isReactedByCurrentUser(reaction)
-                    ? 'bg-primary/20 border-primary border'
-                    : 'bg-muted/80 hover:bg-muted'
-                )}
-              >
-                <span>{reaction.emoji}</span>
-                <span className='text-muted-foreground'>{reaction.count}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div
-          className={cn(
-            'mt-1 flex items-center gap-1',
-            isOwn ? 'justify-end' : 'justify-start'
-          )}
-        >
-          <span
-            className={cn(
-              'text-muted-foreground block text-xs',
-              isOwn && 'text-right'
-            )}
-          >
-            {formatMessageTime(message.createdAt)}
-          </span>
         </div>
       </div>
+
+      <div
+        className={cn(
+          'mt-1 flex items-center text-xs',
+          isOwn ? 'justify-end mr-2' : 'justify-start ml-10'
+        )}
+      >
+        <span className='text-muted-foreground block'>
+          {formatMessageTime(message.createdAt)}
+        </span>
+      </div>
+
+      {message.reactions && message.reactions.length > 0 && (
+        <div
+          className={cn(
+            'mt-1 flex flex-wrap items-center gap-1',
+            isOwn ? 'justify-end mr-2' : 'justify-start ml-10'
+          )}
+        >
+          {message.reactions.map((reaction) => (
+            <button
+              key={reaction.emoji}
+              onClick={() => handleReactionClick(reaction.emoji)}
+              className={cn(
+                'flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] transition-colors border',
+                isReactedByCurrentUser(reaction)
+                  ? 'bg-primary/20 border-primary text-primary'
+                  : 'bg-muted/80 hover:bg-muted border-transparent'
+              )}
+            >
+              <span>{reaction.emoji}</span>
+              <span className={isReactedByCurrentUser(reaction) ? 'text-primary font-medium' : 'text-muted-foreground'}>
+                {reaction.count}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <Dialog open={showRecallDialog} onOpenChange={setShowRecallDialog}>
         <DialogContent>
           <DialogHeader>

@@ -6,7 +6,11 @@ import type { FriendRequestStatus, UserResponse } from '../types';
 export type UserSearchResult = Pick<
   UserResponse,
   'id' | 'username' | 'email' | 'avatarUrl' | 'createdAt'
->;
+> & {
+  isFriend?: boolean;
+  isPendingSent?: boolean;
+  isPendingReceived?: boolean;
+};
 
 export interface FriendRequestResponse {
   id: string;
@@ -46,7 +50,57 @@ export class FriendService {
       take: DEFAULT_PAGE_SIZE,
     });
 
-    return users;
+    const userIds = users.map((u) => u.id);
+
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    // Fetch friendships for current user with these matching users
+    const friendships = await prisma.friendship.findMany({
+      where: {
+        userId: currentUserId,
+        friendId: { in: userIds },
+      },
+      select: {
+        friendId: true,
+      },
+    });
+    const friendIdSet = new Set(friendships.map((f) => f.friendId));
+
+    // Fetch friend requests between current user and these matching users
+    const friendRequests = await prisma.friendRequest.findMany({
+      where: {
+        OR: [
+          { senderId: currentUserId, receiverId: { in: userIds } },
+          { senderId: { in: userIds }, receiverId: currentUserId },
+        ],
+      },
+      select: {
+        senderId: true,
+        receiverId: true,
+        status: true,
+      },
+    });
+
+    const pendingSentIds = new Set(
+      friendRequests
+        .filter((r) => r.senderId === currentUserId && r.status === 'pending')
+        .map((r) => r.receiverId)
+    );
+
+    const pendingReceivedIds = new Set(
+      friendRequests
+        .filter((r) => r.receiverId === currentUserId && r.status === 'pending')
+        .map((r) => r.senderId)
+    );
+
+    return users.map((user) => ({
+      ...user,
+      isFriend: friendIdSet.has(user.id),
+      isPendingSent: pendingSentIds.has(user.id),
+      isPendingReceived: pendingReceivedIds.has(user.id),
+    }));
   }
 
   async sendFriendRequest(senderId: string, receiverId: string): Promise<FriendRequestResponse> {

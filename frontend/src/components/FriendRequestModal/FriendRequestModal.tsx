@@ -117,26 +117,32 @@ export function FriendRequestModal({
                         {user.email}
                       </p>
                     </div>
-                    <Button
-                      size='sm'
-                      onClick={() => handleSendRequest(user.id)}
-                      disabled={
-                        sendingRequestId === user.id || user.requestSent
-                      }
-                      aria-label={
-                        user.requestSent
-                          ? 'Friend request sent'
-                          : 'Send friend request'
-                      }
-                    >
-                      {sendingRequestId === user.id ? (
-                        <Loader2 className='size-4 animate-spin' />
-                      ) : user.requestSent ? (
-                        <Check className='size-4' />
-                      ) : (
-                        <UserPlus className='size-4' />
-                      )}
-                    </Button>
+                    {user.isFriend ? (
+                      <span className='text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-950/30 px-2.5 py-1 rounded-full border border-green-200 dark:border-green-900'>
+                        Friends
+                      </span>
+                    ) : user.isPendingSent || user.requestSent ? (
+                      <span className='text-xs font-semibold text-amber-600 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 rounded-full border border-amber-200 dark:border-amber-900'>
+                        Request Sent
+                      </span>
+                    ) : user.isPendingReceived ? (
+                      <span className='text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-950/30 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-900'>
+                        Pending Approval
+                      </span>
+                    ) : (
+                      <Button
+                        size='sm'
+                        onClick={() => handleSendRequest(user.id)}
+                        disabled={sendingRequestId === user.id}
+                        aria-label='Send friend request'
+                      >
+                        {sendingRequestId === user.id ? (
+                          <Loader2 className='size-4 animate-spin' />
+                        ) : (
+                          <UserPlus className='size-4' />
+                        )}
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>

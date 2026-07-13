@@ -5,6 +5,9 @@ export type UserSearchResult = Pick<
   'id' | 'username' | 'email' | 'avatarUrl' | 'createdAt'
 > & {
   requestSent?: boolean
+  isFriend?: boolean
+  isPendingSent?: boolean
+  isPendingReceived?: boolean
 }
 
 export interface FriendRequest {
