@@ -11,6 +11,9 @@ config()
 
 const app: Application = express()
 
+// Trust proxy to allow express-rate-limit to read client IPs behind Render's load balancer
+app.set('trust proxy', 1)
+
 // Security Middleware
 app.use(helmet())
 
