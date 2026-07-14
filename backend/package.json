@@ -5,7 +5,7 @@
   "main": "dist/src/index.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
-    "build": "tsc",
+    "build": "npm install --include=dev && tsc",
     "start": "prisma migrate deploy && node dist/src/index.js",
     "test": "vitest",
     "test:run": "vitest run",
