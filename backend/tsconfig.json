@@ -19,5 +19,5 @@
   },
   "ignoreDeprecations": "6.0",
   "include": ["src/**/*", "generated/**/*"],
-  "exclude": ["node_modules", "dist", "prisma"]
+  "exclude": ["node_modules", "dist", "prisma", "src/**/__tests__/*", "src/**/*.test.ts"]
 }
