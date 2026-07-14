@@ -54,7 +54,7 @@ Chúng ta sẽ deploy Express API và Socket.io Server dưới dạng một **We
     *   **Branch**: `main` (hoặc branch bạn muốn deploy).
     *   **Root Directory**: `backend` *(Cực kỳ quan trọng: Dự án của chúng ta là dạng monorepo, thiết lập này giúp Render chạy các lệnh cài đặt và build trực tiếp trong thư mục `backend`)*.
     *   **Runtime**: `Node`
-    *   **Build Command**: `npm install --include=dev && npx prisma generate && npm run build` *(Sử dụng cờ `--include=dev` để cài đặt đầy đủ các thư viện devDependencies cần thiết cho quá trình biên dịch TypeScript khi biến môi trường `NODE_ENV` được đặt là `production`)*.
+    *   **Build Command**: `npm run build` *(Lệnh này đã được cấu hình tự động trong package.json để tự động thực hiện: cài đặt devDependencies bằng `--include=dev`, chạy `npx prisma generate` để tạo Client Types và biên dịch TypeScript)*.
     *   **Start Command**: `npm start` *(Lệnh này sẽ tự động chạy `prisma migrate deploy` để cập nhật database schema trước khi khởi động Node server từ `dist/src/index.js`)*.
     *   **Instance Type**: Chọn `Free` (hoặc nâng cấp).
 4.  Mở rộng phần **Advanced** và thêm các biến môi trường (**Environment Variables**):
